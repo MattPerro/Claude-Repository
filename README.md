@@ -9,8 +9,8 @@ tutta in italiano.
 
 ## Come aprirla
 - **Basta un doppio clic** su `index.html` (si apre nel browser). Funziona anche
-  **offline**: l'unica risorsa esterna sono i Google Fonts, e se non ci sono si
-  usano automaticamente i font di sistema.
+  **offline** e **non fa alcuna chiamata di rete**: usa solo i font di sistema,
+  nessuna risorsa esterna (nessun tracciamento, massima privacy).
 - Su iPhone: aprila in **Safari** (puoi inviartela via AirDrop / iCloud Drive e
   aprirla da lì, oppure ospitarla su un URL a tua scelta).
 
