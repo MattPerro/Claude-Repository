@@ -1,0 +1,43 @@
+name: iOS build (David)
+
+# Compila l'app nativa iOS su un runner macOS (Xcode), per verificare che il
+# progetto Swift costruisca davvero. Non richiede firma (build per Simulatore).
+on:
+  push:
+    paths:
+      - "native/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Seleziona Xcode 15
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Versioni
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Installa XcodeGen
+        run: brew install xcodegen
+
+      - name: Genera il progetto Xcode
+        working-directory: native
+        run: xcodegen generate
+
+      - name: Compila (Simulatore iOS, senza firma)
+        working-directory: native
+        run: |
+          xcodebuild \
+            -project David.xcodeproj \
+            -target David \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
