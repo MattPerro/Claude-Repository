@@ -89,7 +89,7 @@ final class Store: ObservableObject {
         return try? JSONDecoder().decode(T.self, from: data)
     }
 
-    static func time(_ h: Int, _ m: Int) -> Date {
+    nonisolated static func time(_ h: Int, _ m: Int) -> Date {
         DateUtils.calendar.date(from: DateComponents(hour: h, minute: m)) ?? Date()
     }
 
