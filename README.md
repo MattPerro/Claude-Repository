@@ -67,5 +67,12 @@ dominio (esercizi e sedute), date DST-safe, logica (streak, aderenza, `.ics`),
 navigazione, render delle 4 schede, anteprima seduta, animazioni SVG e figura
 "David", init. Nessuna dipendenza runtime.
 
+## App nativa iOS (in sviluppo)
+Questa web-app è la **versione "ponte"**. Il progetto dell'**app nativa iPhone**
+— che legge automaticamente le nuotate in piscina da **Apple Salute** (Apple
+Watch), con promemoria veri e aspetto nativo — si trova nella cartella
+[`native/`](native/README-SETUP.md). Va aperto e compilato su un **Mac con
+Xcode**: la guida passo-passo è in `native/README-SETUP.md`.
+
 ---
 *Versione "ponte" in attesa dell'app nativa. Buone bracciate.*

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>David</string>
+    <key>CFBundleDisplayName</key>
+    <string>David</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>UILaunchScreen</key>
+    <dict/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+
+    <!-- Testi mostrati da iOS quando l'app chiede l'accesso ad Apple Salute.
+         Obbligatori: senza questi Apple rifiuta l'app. -->
+    <key>NSHealthShareUsageDescription</key>
+    <string>David legge le tue nuotate in piscina (distanza, vasche, bracciate, battito, calorie) e il tuo peso/altezza da Apple Salute per mostrarti i progressi. I dati restano sul tuo dispositivo.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>David può salvare in Apple Salute il peso e l'altezza che inserisci a mano, così restano allineati con gli altri dati di salute.</string>
+
+    <!-- Accesso al Calendario per aggiungere i promemoria delle sedute (facoltativo). -->
+    <key>NSCalendarsUsageDescription</key>
+    <string>David può aggiungere le sedute di nuoto al tuo Calendario, con un avviso la sera prima.</string>
+</dict>
+</plist>
