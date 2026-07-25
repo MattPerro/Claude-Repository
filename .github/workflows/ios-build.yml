@@ -11,13 +11,11 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    # macOS 15 porta Xcode 16, che supporta il formato progetto generato da XcodeGen.
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Seleziona Xcode 15
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
       - name: Versioni
         run: |
