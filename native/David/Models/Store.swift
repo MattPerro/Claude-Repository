@@ -66,15 +66,16 @@ final class Store: ObservableObject {
         case settings = "david.settings"
     }
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
 
-    init() {
-        let d = UserDefaults.standard
-        pattern = Store.decode([Int: SessionType].self, d, "david.pattern") ?? [0: .A, 3: .B, 5: .C]
-        done = Store.decode([String: SessionType].self, d, "david.done") ?? [:]
-        exChecks = Store.decode([String: Set<String>].self, d, "david.exchecks") ?? [:]
-        weights = Store.decode([WeightEntry].self, d, "david.weights") ?? []
-        settings = Store.decode(Settings.self, d, "david.settings") ?? Settings()
+    /// `defaults` iniettabile per i test (isolamento con un suite dedicato).
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        pattern = Store.decode([Int: SessionType].self, defaults, "david.pattern") ?? [0: .A, 3: .B, 5: .C]
+        done = Store.decode([String: SessionType].self, defaults, "david.done") ?? [:]
+        exChecks = Store.decode([String: Set<String>].self, defaults, "david.exchecks") ?? [:]
+        weights = Store.decode([WeightEntry].self, defaults, "david.weights") ?? []
+        settings = Store.decode(Settings.self, defaults, "david.settings") ?? Settings()
     }
 
     // MARK: Persistenza

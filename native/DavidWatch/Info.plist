@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>David</string>
+    <key>CFBundleDisplayName</key>
+    <string>David</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+
+    <!-- App watchOS a target singolo (SwiftUI). -->
+    <key>WKApplication</key>
+    <true/>
+
+    <!-- Consente alla sessione di allenamento di continuare in background. -->
+    <key>WKBackgroundModes</key>
+    <array>
+        <string>workout-processing</string>
+    </array>
+
+    <!-- Testi permessi Apple Salute (obbligatori). -->
+    <key>NSHealthShareUsageDescription</key>
+    <string>David registra la tua nuotata in piscina (distanza, battito, calorie) in Apple Salute.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>David salva in Apple Salute l'allenamento di nuoto svolto.</string>
+</dict>
+</plist>

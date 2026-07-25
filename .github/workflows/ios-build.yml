@@ -1,7 +1,7 @@
 name: iOS build (David)
 
-# Compila l'app nativa iOS su un runner macOS (Xcode), per verificare che il
-# progetto Swift costruisca davvero. Non richiede firma (build per Simulatore).
+# Compila l'app iOS + Watch e ESEGUE i test su un runner macOS (Xcode).
+# Non richiede firma (build/test per Simulatore).
 on:
   push:
     paths:
@@ -29,13 +29,26 @@ jobs:
         working-directory: native
         run: xcodegen generate
 
-      - name: Compila (Simulatore iOS, senza firma)
+      - name: Test iOS (compila app + esegue i test unitari)
         working-directory: native
         run: |
           xcodebuild \
             -project David.xcodeproj \
-            -target David \
+            -scheme David \
             -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Build app Watch
+        working-directory: native
+        run: |
+          xcodebuild \
+            -project David.xcodeproj \
+            -scheme DavidWatch \
+            -sdk watchsimulator \
+            -destination 'generic/platform=watchOS Simulator' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             build
