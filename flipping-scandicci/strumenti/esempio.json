@@ -1,0 +1,38 @@
+{
+  "riferimento": "ESEMPIO — bilocale, zona da definire, Scandicci",
+  "superficie_mq": 70,
+
+  "prezzo_base": 150000,
+  "prezzo_aggiudicazione": 150000,
+  "compenso_delegato": 3000,
+  "spese_trasferimento": 1500,
+  "cancellazione_gravami": 800,
+
+  "mesi_liberazione": 6,
+  "costo_liberazione": 4000,
+
+  "costo_mq": 600,
+  "oneri_e_pratiche": 6000,
+  "arretrati_condominiali": 2500,
+
+  "mesi_totali": 18,
+  "imu_mensile": 90,
+  "condominio_mensile": 70,
+  "altre_spese_mensili": 60,
+
+  "importo_finanziato": 0,
+  "tasso_annuo": 0,
+  "mesi_finanziamento": 0,
+  "spese_istruttoria": 0,
+
+  "prezzo_vendita_atteso": 260000,
+  "costi_marketing": 2000,
+
+  "opzioni": {
+    "prima_casa": false,
+    "usa_prezzo_valore": false,
+    "valore_catastale": null,
+    "imprevisti_pct": 0.15,
+    "rivendita_entro_5_anni": true
+  }
+}
