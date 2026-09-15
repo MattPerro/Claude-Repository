@@ -112,7 +112,9 @@ Il progetto si ferma, su un lotto o in generale, se:
 | **Analisi economica** | agente `roi-analista` + `roi.py` | Modello, soglia d'asta, sensibilità | F4 |
 | **Due diligence** | agente `asta-due-diligence` + **legale** | Rischi legali e occupativi | F3 |
 | **Mercato** | agente `mercato-scandicci` + **agenzie locali** | Prezzo e tempi di uscita | F1, F4 |
-| **Tecnico** | **geometra o architetto** + `cantiere-stima` | Sopralluogo, computo, pratiche, DL | F3, F8 |
+| **Tecnico** | **geometra reale** + agenti `geometra` / `architetto` | Sopralluogo, computo, pratiche, DL, istruttoria comunale | F3, F8 |
+| **Intake** | agente `intervistatore` | Traduce l'intento del decisore in istruzioni per gli esperti | F2–F4 |
+| **Controllo qualità** | agente `revisore` | Respinge referti non tracciabili prima del modello | F4 |
 | **Impresa esecutrice** | da selezionare | Lavori | F8 |
 | **Legale esecuzioni** | da individuare | Liberazione, opposizioni | F3, F7 |
 | **Commercialista** | da individuare | Regime fiscale, plusvalenza | F0, F10 |
@@ -127,6 +129,31 @@ loro tempi sono un rischio, non una variabile di piano:
 | **Custode giudiziario** | Visite, esecuzione dell'ordine di liberazione | Determina i tempi di F7 |
 | **Amministratore di condominio** | Arretrati, delibere di lavori | Fonte dell'esposizione ex art. 63 disp. att. c.c. |
 | **Debitore esecutato / occupanti** | — | Determinano la durata e il costo di F7 |
+| **Ufficio edilizia privata del Comune** | Sanabilità, vincoli, oneri, titoli | Vedi sotto: **nessun agente lo impersona** |
+
+### Perché nessun agente impersona il Comune
+
+Un agente che risponda *come* l'ufficio edilizia privata produrrebbe, con
+l'autorevolezza di un funzionario, risposte inventate su fatti che non sono
+desumibili da fonti accessibili: il Regolamento Urbanistico applicato a una
+particella specifica, i vincoli puntuali, le prassi di quell'ufficio.
+
+E la sanabilità è **binaria**. Su una stima di costo sbagliata del 20% si perde
+margine; su una sanabilità sbagliata si perde l'operazione intera (**R4**,
+impatto "immobile non rivendibile"), perché l'irregolarità si trasferisce
+all'acquirente finale e gli blocca il rogito o il mutuo.
+
+La regola che ne deriva, valida per tutto il pool:
+
+> Un agente può impersonare un ruolo quando il suo output è **un metodo** (il
+> computo del geometra) o **un dato recuperabile** (i comparabili dell'agente
+> immobiliare). Non quando l'output è **una decisione di un'autorità locale**.
+
+Al suo posto, l'agente `geometra` si occupa dell'**istruttoria**: prepara la
+richiesta di accesso agli atti, formula le domande da porre allo sportello in
+ordine di criticità, indica cosa consultare negli strumenti urbanistici, e
+**verifica la coerenza della risposta ottenuta** con quanto dice la perizia.
+Fa risparmiare due viaggi; non finge di sapere cosa deciderà il Comune.
 
 > **Gli agenti non sostituiscono i professionisti.** Preparano il lavoro, lo
 > strutturano e lo rendono verificabile. La firma su una due diligence legale,
@@ -748,16 +775,29 @@ flipping-scandicci/
     └── visti.md                   storico dei lotti esaminati
 ```
 
-| Agente | Fase | Ruolo |
-|---|---|---|
-| `asta-scout` | F2 | Trova e screma i lotti |
-| `asta-due-diligence` | F3 | Cosa si compra davvero |
-| `mercato-scandicci` | F1, F4 | Prezzo e tempi di uscita |
-| `cantiere-stima` | F4, F8 | Ambito e costo dei lavori |
-| `roi-analista` | F4 | Modello, soglia d'asta, sensibilità |
-| `pm-progetto` | tutte | Artefatti, avanzamento, gate |
+| Agente | Fase | Ruolo | Quando gira |
+|---|---|---|---|
+| `procacciatore` | F2 | Trova i lotti con stato verificato, applica il filtro proxy | continuo |
+| `intervistatore` | F2–F4 | Progetta le domande, compila il briefing | prima di ogni fan-out |
+| `asta-due-diligence` | F3 | Cosa si compra davvero | fan-out, sempre |
+| `mercato-scandicci` | F1, F4 | Prezzo e tempi di uscita | fan-out, sempre |
+| `geometra` | F3, F4, F8 | Computo, conformità, catasto, istruttoria comunale | fan-out, sempre |
+| `architetto` | F4, F8 | Ridistribuzione e livelli alti | solo se opportuno |
+| `revisore` | F4 | Controlla i referti, può respingere | **prima** del modello |
+| `roi-analista` | F4 | Modello, soglia d'asta, sensibilità | dopo il revisore |
+| `pm-progetto` | tutte | Artefatti, avanzamento, gate | apertura e gate |
+| `consulente-executive` | G3, G5, G6 | Una pagina per decidere, costo opportunità | su richiesta |
+
+Fan-out pesante: **tre** agenti in parallelo. Gli altri sono condizionali o
+terminali — altrimenti ogni domanda costa dieci ricerche web.
+
+**L'orchestratore non è un agente.** È la sessione principale, guidata dalle
+skill: è l'unica cosa che parla col decisore, riconcilia le contraddizioni fra
+esperti e porta la decisione. `pm-progetto` tiene gli artefatti, non orchestra.
 
 | Skill | Uso |
 |---|---|
+| `/esperti` | Porta d'ingresso: stato del progetto, chi c'è, instradamento |
+| `/profilo` | Intervista iniziale → charter e soglie di screening |
 | `/valuta-asta` | Valutazione completa di un lotto → soglia d'offerta |
 | `/monitora-aste` | Sorveglianza ricorrente, pensata per `/loop` |

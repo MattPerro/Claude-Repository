@@ -20,11 +20,19 @@ script è un errore, anche se è giusto.
 Il motivo è strutturale: il modello è testato (`test_roi.py`), tracciabile e
 identico ad ogni esecuzione. La tua stima a occhio non è nessuna delle tre.
 
+## Prerequisito: il revisore deve aver dato il via
+Non giri prima che il `revisore` abbia esaminato i referti del fan-out. Se
+l'esito è **RESPINTO**, non calcoli nulla: i parametri tornano agli agenti.
+Se è **RILIEVO**, calcoli e **riporti le limitazioni in testa** al risultato,
+con le parole del revisore.
+
 ## Procedura
 
 1. **Leggi** `flipping-scandicci/strumenti/roi.py` (l'elenco dei parametri e il
-   loro significato sta nella dataclass `Parametri`) e
-   `flipping-scandicci/riferimenti/fiscalita-e-costi.md` per i regimi fiscali.
+   loro significato sta nella dataclass `Parametri`),
+   `flipping-scandicci/riferimenti/fiscalita-e-costi.md` per i regimi fiscali, e
+   il `briefing.md` del lotto per la soglia di ROI e il regime scelti dal
+   decisore. **La soglia di ROI target non la decidi tu**: è nel briefing.
 
 2. **Scrivi i parametri** in
    `flipping-scandicci/valutazioni/<riferimento-lotto>/parametri.json`.
@@ -41,7 +49,7 @@ identico ad ogni esecuzione. La tua stima a occhio non è nessuna delle tre.
    ```
 
 4. **Gira tre scenari** — prudente, centrale, ottimista — usando i tre prezzi di
-   uscita di `mercato-scandicci` e le durate di `cantiere-stima`. Tre file di
+   uscita di `mercato-scandicci` e le durate del `geometra`. Tre file di
    parametri, tre esecuzioni.
    **Il verdetto si dà sullo scenario prudente.** Il centrale è il caso atteso,
    l'ottimista serve solo a misurare quanto si lascia sul tavolo.
@@ -90,6 +98,10 @@ ha spazio per errori.
 **F. Assunzioni** — elenco numerato di ogni parametro con la sua fonte
 (quale agente, quale documento) e il suo livello di confidenza. Marca in modo
 visibile i parametri **stimati** contro quelli **verificati**.
+
+**G. Domande per il decisore** — massimo 3, in ordine di impatto. Tipicamente:
+*"a 92.000 € il ROI prudente è 10,9%, sotto la tua soglia del 15% — confermi la
+soglia o la rivedi per questo lotto?"* Se non ne hai, scrivi "nessuna".
 
 ## Onestà del modello
 - Il capitale investito nel modello è il capitale proprio immobilizzato: se

@@ -38,8 +38,9 @@ Tre regole che tengono il loop utile:
 Crea il file se non esiste.
 
 ### 2. Cerca
-Ingaggia **`asta-scout`** per le pubblicazioni nuove o modificate sul Comune di
-Scandicci, Tribunale di Firenze.
+Ingaggia **`procacciatore`** per le pubblicazioni nuove o modificate sul Comune
+di Scandicci, Tribunale di Firenze. Passagli la soglia di ROI del profilo: la
+applica come filtro proxy derivato dal modello, non come ROI stimato.
 
 Cambiamenti che contano su lotti **già visti**:
 - nuovo esperimento con **prezzo base ribassato** (un lotto scartato al primo
@@ -48,15 +49,28 @@ Cambiamenti che contano su lotti **già visti**:
 - **stato occupativo cambiato** (ordine di liberazione eseguito): è la
   variazione che più sposta un giudizio
 
-### 3. Pre-filtro
-Prima di spendere un'analisi completa, uno sbarramento grossolano su
-prezzo base, superficie, stato occupativo e €/mq di zona.
+### 3. Pre-filtro — derivato, non stimato
+Lo sbarramento è la **soglia di screening** calcolata dal modello:
+
+```bash
+python3 flipping-scandicci/strumenti/soglie.py --uscita-mq <EUR/mq di zona> \
+        --roi <soglia del profilo> [--mq <superficie>] [--libero]
+```
+
+Restituisce il prezzo base massimo al mq oltre il quale il lotto non può
+rispettare l'obiettivo di ROI. Si applica col solo avviso di vendita e il dato
+OMI di zona, in dieci secondi, senza perizia.
+
+**Non stimare un ROI in questa fase.** Il ROI richiede prezzo di uscita, computo
+dei lavori e stato occupativo: dati che non hai ancora. Un ROI inventato a
+questo stadio è peggio di nessun ROI, perché poi nessuno lo mette più in
+discussione.
 
 Lo scopo è **escludere a basso costo**, non stimare. Un lotto che supera il
 pre-filtro non è un affare: è un candidato che merita la valutazione vera.
 
 Scarta senza esitare: locazione opponibile, quota indivisa, diritti reali di
-terzi, abuso non sanabile, tipologia fuori perimetro.
+terzi, abuso non sanabile, tipologia fuori perimetro, prezzo base sopra soglia.
 
 ### 4. Segnala, e solo allora
 Per ogni lotto che passa, **massimo cinque righe**:
@@ -73,6 +87,12 @@ Rischio principale: <una riga>
 Non lanciare la valutazione completa da dentro il loop senza che l'utente la
 chieda: una due diligence completa a ogni giro su ogni lotto è uno spreco, e
 il giro deve restare leggero.
+
+**Chiedi quali approfondire**, non deciderlo tu. Una due diligence costa
+800–2.800 € e con un tasso realistico di 1 aggiudicazione su 5–8 i cicli a vuoto
+si caricano sull'operazione riuscita. E chiedi **perché** scarta quelli che
+scarta: quella risposta tara il pre-filtro per la tornata successiva, ed è il
+modo in cui il sistema impara i gusti reali del decisore.
 
 **Eccezione**, l'unica: un lotto la cui asta cade entro **7 giorni** e che ha
 superato il pre-filtro. Lì il tempo è il vincolo e vale segnalarlo con urgenza
