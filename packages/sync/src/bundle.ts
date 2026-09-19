@@ -197,6 +197,16 @@ export interface BundleRejection {
   /** `bundleId` se e' stato possibile leggerlo, per la registrazione. */
   readonly bundleId: string | null;
   readonly detail?: string;
+  /**
+   * File remoto da cui proviene il pacchetto rifiutato.
+   *
+   * Non lo riempie il parser (che vede solo del testo) ma il motore. Serve a
+   * mettere il file in **quarantena** e a **ritentarlo** ai giri successivi:
+   * un rifiuto puo' essere transitorio (download interrotto a meta'), e senza
+   * questo riferimento il cursore avanzerebbe oltre il cambiamento e il
+   * pacchetto non verrebbe mai piu' visto. Sarebbe una perdita silenziosa.
+   */
+  readonly fileId?: string;
 }
 
 export type BundleParseResult =

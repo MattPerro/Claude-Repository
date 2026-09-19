@@ -46,7 +46,8 @@ export class InMemorySyncStateStore implements SyncStateStore {
   private pushIntent: PushIntent | null = null;
   private pushed: PushedBundle[] = [];
   private seenBundles = new Map<string, string>();
-  private rejected: BundleRejection[] = [];
+  /** Quarantena dei pacchetti rifiutati, indicizzata per file remoto. */
+  private rejected = new Map<string, BundleRejection>();
   private entities = new Map<string, EntityRecord>();
   private conflicts: Conflict[] = [];
   private deferred: DeferredOperation[] = [];
@@ -138,7 +139,7 @@ export class InMemorySyncStateStore implements SyncStateStore {
   }
 
   async listRejectedBundles(): Promise<readonly BundleRejection[]> {
-    return [...this.rejected];
+    return [...this.rejected.values()];
   }
 
   // --- applicazione atomica ----------------------------------------------
@@ -171,7 +172,12 @@ export class InMemorySyncStateStore implements SyncStateStore {
     this.seenBundles = seen;
     this.conflicts = conflicts;
     this.deferred = [...batch.deferred];
-    this.rejected = [...this.rejected, ...batch.rejectedBundles];
+    const quarantena = new Map(this.rejected);
+    for (const fileId of batch.clearedRejections) quarantena.delete(fileId);
+    for (const rejection of batch.rejectedBundles) {
+      quarantena.set(rejection.fileId ?? rejection.bundleId ?? rejection.code, rejection);
+    }
+    this.rejected = quarantena;
     if (batch.lamport > this.lamport) this.lamport = batch.lamport;
     if (batch.cursor !== null) this.cursor = batch.cursor;
     if (batch.syncedAt !== null) this.lastSyncedAt = batch.syncedAt;

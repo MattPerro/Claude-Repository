@@ -31,3 +31,5 @@ export * from './engine/exposure.js';
 export * from './engine/progression.js';
 export * from './engine/shortenSession.js';
 export * from './engine/engine.js';
+
+export * from './timer/timer.js';

@@ -407,7 +407,14 @@ export function createBackupRepository(db: Database): BackupRepository {
             const params = columns.map((c) => row[c] ?? null);
             const conflictClause =
               onDuplicate === 'skip'
-                ? 'ON CONFLICT(id) DO NOTHING'
+                ? // Senza bersaglio esplicito: cosi' il salto copre anche i
+                  // vincoli UNIQUE diversi dalla chiave primaria. Serve per
+                  // le tabelle a riga unica per archivio (`settings`,
+                  // `program_cursor`), dove un ripristino da un altro
+                  // dispositivo porta un `id` diverso ma lo stesso
+                  // `workspace_id`: senza questo, l'importazione fallirebbe
+                  // invece di riconoscere il duplicato.
+                  'ON CONFLICT DO NOTHING'
                 : `ON CONFLICT(id) DO UPDATE SET ${columns
                     .filter((c) => c !== 'id')
                     .map((c) => `${c} = excluded.${c}`)

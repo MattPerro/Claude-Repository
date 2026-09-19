@@ -64,8 +64,8 @@ function makeClockAndIds(): { clock: FakeClock; ids: IdGenerator } {
 }
 
 /** Driver in memoria, senza migrazioni applicate. */
-export function rawDriver(): SqlDriver {
-  return openNodeSqlite({ location: ':memory:' });
+export function rawDriver(location = ':memory:'): SqlDriver {
+  return openNodeSqlite({ location });
 }
 
 export interface OpenOptions {
@@ -74,11 +74,13 @@ export interface OpenOptions {
   readonly targetVersion?: number;
   /** Salta la creazione di archivio, profilo e attrezzature. */
   readonly bare?: boolean;
+  /** Percorso del file; il valore predefinito e' `:memory:`. */
+  readonly location?: string;
 }
 
 /** Database migrato, con archivio e attrezzature sintetiche. */
 export function openTestDb(options: OpenOptions = {}): TestContext {
-  const driver = rawDriver();
+  const driver = rawDriver(options.location);
   if (options.targetVersion !== undefined) {
     migrate(driver, options.targetVersion);
   }

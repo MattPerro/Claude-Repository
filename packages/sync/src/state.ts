@@ -96,8 +96,18 @@ export interface IncomingBatch {
   readonly deferred: readonly DeferredOperation[];
   /** Pacchetti visti, per non riscaricarli ne' riapplicarli. */
   readonly seenBundles: readonly { readonly bundleId: string; readonly fileId: string }[];
-  /** Pacchetti rifiutati, registrati per la diagnostica. */
+  /**
+   * Pacchetti rifiutati: vanno in **quarantena** (non semplicemente
+   * registrati). La quarantena e' indicizzata per `fileId` e viene ritentata
+   * a ogni pull successivo.
+   */
   readonly rejectedBundles: readonly BundleRejection[];
+  /**
+   * `fileId` da togliere dalla quarantena perche' riletti correttamente e
+   * applicati: e' il caso del download interrotto che al secondo tentativo
+   * arriva integro.
+   */
+  readonly clearedRejections: readonly string[];
   /** Nuovo massimo del contatore logico. */
   readonly lamport: number;
   /**
@@ -143,6 +153,7 @@ export interface SyncStateStore {
 
   // --- idempotenza del pull ----------------------------------------------
   hasSeenBundle(bundleId: string): Promise<boolean>;
+  /** Quarantena: pacchetti rifiutati, da ritentare ai giri successivi. */
   listRejectedBundles(): Promise<readonly BundleRejection[]>;
 
   // --- applicazione atomica ----------------------------------------------
@@ -194,6 +205,7 @@ export const EMPTY_BATCH: IncomingBatch = {
   deferred: [],
   seenBundles: [],
   rejectedBundles: [],
+  clearedRejections: [],
   lamport: 0,
   cursor: null,
   syncedAt: null,

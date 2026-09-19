@@ -65,6 +65,7 @@ import {
   type SyncSnapshot,
 } from './snapshot.js';
 import {
+  DriveNotFoundError,
   isAccessOrTransportError,
   type DriveFileMetadata,
   type DriveStore,
@@ -668,7 +669,13 @@ export class SyncEngine {
         const page = await withRetry(() => this.drive.listChanges(cursor), this.retryContext());
         const nextCursor = page.nextPageToken ?? page.newStartPageToken ?? cursor;
 
-        const collected = await this.collectBundles(page.changes);
+        // Oltre alla pagina corrente si ritentano i pacchetti in quarantena:
+        // un rifiuto per download interrotto e' transitorio, e il cursore e'
+        // gia' avanzato oltre il loro cambiamento.
+        const quarantena = (await this.store.listRejectedBundles())
+          .map((r) => r.fileId)
+          .filter((id): id is string => id !== undefined);
+        const collected = await this.collectBundles(page.changes, quarantena);
         rejected.push(...collected.rejected);
         totals.bundles += collected.bundles.length;
         totals.skipped += collected.skipped;
@@ -681,6 +688,7 @@ export class SyncEngine {
             fileId: collected.fileIdOf.get(b.bundleId) ?? '',
           })),
           rejectedBundles: collected.rejected,
+          clearedRejections: collected.cleared,
           cursor: nextCursor,
           markSynced: true,
         });
@@ -796,7 +804,7 @@ export class SyncEngine {
         );
         const parsed = parseBundle(text, { workspaceId: this.options.workspaceId });
         if (!parsed.ok) {
-          rejected.push(parsed.rejection);
+          rejected.push({ ...parsed.rejection, fileId: file.id });
           continue;
         }
         bundles.push(parsed.bundle);
@@ -1032,6 +1040,7 @@ export class SyncEngine {
       readonly seedLamport?: number;
       readonly seenBundles: readonly { bundleId: string; fileId: string }[];
       readonly rejectedBundles: readonly BundleRejection[];
+      readonly clearedRejections?: readonly string[];
       readonly cursor: string | null;
       readonly markSynced: boolean;
       readonly keepDeferred?: readonly DeferredOperation[];
@@ -1188,6 +1197,7 @@ export class SyncEngine {
       deferred,
       seenBundles: options.seenBundles,
       rejectedBundles: options.rejectedBundles,
+      clearedRejections: options.clearedRejections ?? [],
       lamport: lamport.current(),
       cursor: options.cursor,
       syncedAt: options.markSynced ? now : null,
@@ -1222,16 +1232,52 @@ export class SyncEngine {
   // Lettura dei pacchetti dai cambiamenti
   // -------------------------------------------------------------------------
 
-  private async collectBundles(changes: readonly { fileId: string; removed: boolean; file: DriveFileMetadata | null }[]): Promise<{
+  private async collectBundles(
+    changes: readonly { fileId: string; removed: boolean; file: DriveFileMetadata | null }[],
+    retryFileIds: readonly string[] = [],
+  ): Promise<{
     bundles: readonly OperationBundle[];
     rejected: readonly BundleRejection[];
+    cleared: readonly string[];
     skipped: number;
     fileIdOf: Map<string, string>;
   }> {
     const bundles: OperationBundle[] = [];
     const rejected: BundleRejection[] = [];
+    const cleared: string[] = [];
     const fileIdOf = new Map<string, string>();
+    const visited = new Set<string>();
     let skipped = 0;
+
+    // Prima la quarantena: se un pacchetto rifiutato per un download
+    // interrotto arriva integro, va applicato e togliere dalla quarantena.
+    for (const fileId of retryFileIds) {
+      visited.add(fileId);
+      let text: string;
+      try {
+        text = await withRetry(() => this.drive.downloadFile(fileId), this.retryContext());
+      } catch (error) {
+        // File scomparso: resta in quarantena solo se e' un problema di
+        // integrita'; se non esiste piu' non c'e' nulla da ritentare.
+        if (error instanceof DriveNotFoundError) {
+          cleared.push(fileId);
+          continue;
+        }
+        throw error;
+      }
+      const parsed = parseBundle(text, { workspaceId: this.options.workspaceId });
+      if (!parsed.ok) {
+        rejected.push({ ...parsed.rejection, fileId });
+        continue;
+      }
+      if (await this.store.hasSeenBundle(parsed.bundle.bundleId)) {
+        cleared.push(fileId);
+        continue;
+      }
+      bundles.push(parsed.bundle);
+      fileIdOf.set(parsed.bundle.bundleId, fileId);
+      cleared.push(fileId);
+    }
 
     // I cambiamenti possono arrivare in qualunque ordine. Si ordina per
     // `lamportMax` dichiarato nelle proprieta' del file: e' un'euristica utile
@@ -1252,6 +1298,10 @@ export class SyncEngine {
         continue;
       }
       const file = change.file;
+      if (visited.has(file.id)) {
+        skipped += 1;
+        continue;
+      }
       if (file.trashed) {
         skipped += 1;
         continue;
@@ -1270,23 +1320,28 @@ export class SyncEngine {
         skipped += 1;
         continue;
       }
-      if (await this.store.hasSeenBundle(bundleId)) {
-        // De-duplicazione sull'`id` del pacchetto, non sul nome del file.
+      // De-duplicazione sull'`id` del pacchetto, non sul nome del file.
+      // Due controlli, perche' il duplicato puo' essere sia gia' applicato in
+      // passato sia presente due volte nella **stessa** pagina: in Drive due
+      // `files.create` con lo stesso nome producono due file distinti.
+      if (fileIdOf.has(bundleId) || (await this.store.hasSeenBundle(bundleId))) {
         skipped += 1;
         continue;
       }
       const text = await withRetry(() => this.drive.downloadFile(file.id), this.retryContext());
       const parsed = parseBundle(text, { workspaceId: this.options.workspaceId });
       if (!parsed.ok) {
-        // Pacchetto rifiutato: NON si tocca nulla in locale. Si registra e si
-        // prosegue con gli altri (specifica §14).
-        rejected.push(parsed.rejection);
+        // Pacchetto rifiutato: NON si tocca nulla in locale. Va in quarantena
+        // col riferimento al file, cosi' il prossimo pull lo ritenta (un
+        // download interrotto e' transitorio), e si prosegue con gli altri
+        // (specifica §14).
+        rejected.push({ ...parsed.rejection, fileId: file.id });
         continue;
       }
       bundles.push(parsed.bundle);
       fileIdOf.set(parsed.bundle.bundleId, file.id);
     }
-    return { bundles, rejected, skipped, fileIdOf };
+    return { bundles, rejected, cleared, skipped, fileIdOf };
   }
 
   // -------------------------------------------------------------------------

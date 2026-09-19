@@ -186,14 +186,3 @@ export function withHookOnFirstDownload(drive: DriveStore, hook: () => void): Dr
     deleteFile: (fileId: string): Promise<void> => drive.deleteFile(fileId),
   };
 }
-
-/** Valore di un campo di un'entita' materializzata, per le asserzioni. */
-export async function fieldOf(
-  device: Device,
-  entityType: Parameters<InMemorySyncStateStore['readEntity']>[0],
-  entityId: string,
-  field: string,
-): Promise<unknown> {
-  const record = await device.store.readEntity(entityType, entityId);
-  return record?.fields[field];
-}
