@@ -8,7 +8,8 @@
     "ios": "expo run:ios",
     "prebuild": "expo prebuild --platform ios",
     "typecheck": "tsc --noEmit",
-    "doctor": "npx expo-doctor"
+    "doctor": "npx expo-doctor",
+    "export:web": "expo export --platform web --output-dir ../../artifacts/web --no-minify"
   },
   "dependencies": {
     "@trackstrong/core": "*",
@@ -40,6 +41,9 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "@expo/metro-runtime": "~57.0.16",
+    "react-dom": "19.2.3",
+    "react-native-web": "~0.21.0"
   }
 }

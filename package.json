@@ -12,11 +12,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "mobile": "npm run start --workspace @trackstrong/mobile"
+    "mobile": "npm run start --workspace @trackstrong/mobile",
+    "screenshots": "node tools/screenshots.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
     "eslint": "^10.11.0",
+    "playwright": "^1.63.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.1"
