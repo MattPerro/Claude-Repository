@@ -1,0 +1,6 @@
+# Progetti nativi generati da `expo prebuild`: rigenerabili, e contengono
+# identificativi di firma locali.
+/ios/
+/android/
+.expo/
+expo-env.d.ts
