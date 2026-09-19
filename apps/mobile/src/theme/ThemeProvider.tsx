@@ -37,10 +37,15 @@ export interface Theme {
   readonly minTouchSize: typeof MIN_TOUCH_SIZE;
   readonly primaryActionHeight: typeof PRIMARY_ACTION_HEIGHT;
   /**
-   * Durate delle animazioni. Sono tutte 0 se l'utente ha chiesto la riduzione
-   * dei movimenti nelle impostazioni di iOS (specifica §9.1).
+   * Durate delle animazioni, in millisecondi. Sono tutte 0 se l'utente ha
+   * chiesto la riduzione dei movimenti nelle impostazioni di iOS
+   * (specifica §9.1).
+   *
+   * Il tipo e' `number` e non il tipo letterale di `MOTION`: con la riduzione
+   * attiva i valori diventano 0, e un tipo letterale lo renderebbe
+   * inesprimibile.
    */
-  readonly motion: typeof MOTION;
+  readonly motion: { readonly fast: number; readonly normal: number; readonly slow: number };
   readonly reduceMotion: boolean;
 }
 

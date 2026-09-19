@@ -545,7 +545,6 @@ export function EmptyState({
   readonly actionLabel?: string;
   readonly onAction?: () => void;
 }): React.ReactElement {
-  const t = useTheme();
   return (
     <Card style={{ alignItems: 'flex-start' }}>
       <TsText role="bodyLarge" weight="semibold">
