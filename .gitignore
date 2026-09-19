@@ -1,0 +1,76 @@
+# ---------------------------------------------------------------------------
+# Dipendenze e build
+# ---------------------------------------------------------------------------
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.expo/
+.expo-shared/
+web-build/
+coverage/
+
+# Progetti nativi generati da `expo prebuild` (rigenerabili, contengono
+# identificativi di firma locali)
+/apps/mobile/ios/
+/apps/mobile/android/
+
+# ---------------------------------------------------------------------------
+# DATI PERSONALI - non devono MAI entrare nel repository.
+# Il repository contiene codice, test, documentazione e dati sintetici.
+# Non e' il backup degli allenamenti.
+# ---------------------------------------------------------------------------
+# Bootstrap personale (profilo reale di Mattia, pesi, misure)
+personal/
+*.personal.json
+*.personal.ts
+bootstrap.local.*
+
+# Database operativi e backup
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+backups/
+*.trackstrong-backup
+*.trackstrong-backup.json
+
+# Foto di progresso
+photos/
+progress-photos/
+
+# ---------------------------------------------------------------------------
+# Segreti, token, credenziali, certificati
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.mobileprovision
+*.cer
+*.certSigningRequest
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+client_secret*.json
+credentials.json
+token.json
+*.tokens.json
+
+# ---------------------------------------------------------------------------
+# Sistema / editor
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Screenshot di review generati localmente (rigenerabili)
+/artifacts/

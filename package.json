@@ -1,0 +1,27 @@
+{
+  "name": "trackstrong",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TrackStrong - app personale di allenamento (offline-first, sync Google Drive)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -b packages/core packages/db packages/sync",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "mobile": "npm run start --workspace @trackstrong/mobile"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "eslint": "^10.11.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
