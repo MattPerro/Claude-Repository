@@ -67,20 +67,30 @@ Usi invece un **filtro proxy derivato dal modello**:
 
 ```bash
 python3 flipping-scandicci/strumenti/soglie.py --uscita-mq <EUR/mq di zona> \
-        --roi <obiettivo> [--mq <superficie>] [--libero]
+        --roi <obiettivo> [--mq <superficie>] [--libero] \
+        [--costo-mq <250 rinfrescata | 600 straordinaria>] [--mesi <durata>]
 ```
 
 Restituisce il **prezzo base massimo al mq** oltre il quale il lotto non può
-rispettare quell'obiettivo. Ordini di grandezza, a 3.200 €/mq di uscita:
+rispettare quell'obiettivo.
 
-| ROI obiettivo | Occupato | Libero |
-|---|---|---|
-| 15% | ≤ 50% dell'uscita/mq | ≤ 54% |
-| 20% | ≤ 45% | ≤ 49% |
-| 25% | ≤ 40% | ≤ 45% |
+**La soglia è zona-dipendente, e non solo per il prezzo.** Le zone differiscono
+anche per **tempi di assorbimento**, e con un orizzonte stretto quelli sono il
+vincolo: una zona lenta richiede un prezzo d'ingresso più basso a parità di ROI.
+Usa `--mesi` per applicare la durata della zona.
 
-**Esegui lo script, non usare questa tabella a memoria**: cambia col €/mq di
-zona, la superficie e il costo dei lavori ipotizzato.
+Se il profilo del decisore contiene una tabella di soglie per zona, **usa
+quella** — è già calcolata con le durate corrette. Altrimenti esegui lo script.
+
+> **Trappola da conoscere.** La soglia più alta non indica la zona migliore. A
+> Scandicci la fascia collinare (Mosciano-Giogoli) ha i €/mq di uscita più alti
+> del comune e quindi la soglia più generosa — ma i tempi di assorbimento
+> peggiori. Con metrica annualizzata **un €/mq alto non compensa un
+> assorbimento lento.** Il filtro è la combinazione di soglia **e** perimetro di
+> zona, mai la soglia isolata.
+
+**Esegui lo script, non andare a memoria**: la soglia cambia col €/mq di zona,
+la superficie, il costo dei lavori e la durata.
 
 Il filtro è grossolano per costruzione. Serve a **escludere a basso costo**, non
 a stimare. Un lotto che lo supera non è un affare: è un candidato che merita

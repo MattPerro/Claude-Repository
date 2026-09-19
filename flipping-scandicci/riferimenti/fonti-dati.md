@@ -47,6 +47,28 @@ fissata la **zona omogenea OMI** del lotto. Centro, Casellina, Vingone,
 San Giusto, Le Bagnese, Badia a Settimo, la fascia collinare verso Mosciano e
 Scandicci Alto: profili di prezzo e di domanda diversi.
 
+> **Aggiramento utile: la zona OMI si prende dalla perizia, non dalla mappa.**
+> Ricostruire la mappa comunale codice↔zona è difficile e i mirror pubblici si
+> contraddicono (rilevato 19/09/2026: `D2` attribuito a due aree incompatibili,
+> il Centro sia `B3` sia `B4`, tre fasce €/mq diverse per lo stesso comune).
+>
+> Non serve. **Ogni perizia CTU dichiara la zona OMI del lotto.** Prendi il
+> codice dalla perizia, lotto per lotto, e la mappa comunale diventa un
+> nice-to-have invece di un blocco.
+
+### Accessibilità delle fonti da rete aziendale — verificato 19/09/2026
+
+Da una sessione dietro un proxy di egress aziendale, questi domini rispondono
+**403 in CONNECT** (policy di rete, non un problema di metodo):
+
+`agenziaentrate.gov.it` · `*.tecnocasa.it` · `pvp.giustizia.it` ·
+`astegiudiziarie.it` · `immobiliare.it` · `idealista.it` ·
+`borsinoimmobiliare.it` · `comune.scandicci.fi.it`
+
+**Su una macchina personale funzionano.** Se la ricerca di mercato o quella dei
+lotti torna con confidenza bassa per fonti irraggiungibili, la soluzione è
+rieseguirla da rete non filtrata, non cambiare metodo.
+
 **Fattore trasversale da verificare per ogni lotto:** distanza dalle fermate
 della tramvia T1 e accessibilità verso Firenze. A Scandicci pesa sul prezzo e
 soprattutto sui **tempi di vendita**.

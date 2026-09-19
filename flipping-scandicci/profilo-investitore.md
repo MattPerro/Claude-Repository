@@ -1,11 +1,21 @@
 # Profilo investitore
 
-Versione 1 — 15 settembre 2026
+**Versione 2 — 19 settembre 2026**
 Comune di Scandicci (FI) — Tribunale di Firenze
 
 Questo documento è il **charter** del progetto (§1 di `PIANO-PROGETTO.md`) e la
 base che ogni esperto legge prima di lavorare. Le soglie qui fissate entrano in
 `offerta_massima()` e determinano il tetto d'offerta in asta.
+
+> **Cosa è cambiato dalla v1.** Tre decisioni prese sulla base del referto di
+> `mercato-scandicci` del 19/09/2026, delegate dal decisore ("fai te il meglio
+> che puoi"):
+> 1. **Binario straordinaria declassato** da alternativa a solo-rimedio
+> 2. **Durate riviste**: `MESI_LIBERO` 11 → 13, `MESI_OCCUPATO` 18 → 20
+> 3. **Soglie per zona** invece di una soglia unica, con durata zona-dipendente
+>
+> Il punto aperto n.1 (valori OMI) **resta aperto**: bloccato dalla policy di
+> rete di questa sessione, non dal metodo. Vedi §Punti aperti.
 
 ---
 
@@ -15,24 +25,41 @@ base che ogni esperto legge prima di lavorare. Le soglie qui fissate entrano in
 |---|---|
 | Disponibile al picco | **200.000 – 350.000 €** |
 | Leva finanziaria | nessuna assunta — `[DA CONFERMARE]` |
-| Tempo di mobilitazione | `[DA REPERIRE]` — vincolante per il saldo |
+| Tempo di mobilitazione | `[DA REPERIRE]` — presidiato dal decisore |
 
-**Capienza verificata.** Il picco di esposizione richiesto dalle operazioni in
-perimetro (calcolato con `roi.py`, uscita 3.200 €/mq):
+### Fabbisogno effettivo, per zona e taglio
 
-| | 70 mq | 110 mq |
-|---|---|---|
-| Rinfrescata | 167.000 € | 264.000 € |
-| Straordinaria | 167.000 € | 264.000 € |
+Binario rinfrescata, immobile libero, 13 mesi, ROI 20% prudente:
 
-Entrambi dentro la fascia dichiarata, con margine sui tagli medi.
+| | Offerta max | **Picco di cassa** | **Entro 120 giorni** | Utile netto |
+|---|---|---|---|---|
+| Casellina 70 mq | 111.300 | **160.500** | 127.100 | 32.100 |
+| Centro 70 mq | 120.100 | **170.100** | 136.700 | 34.000 |
+| Casellina 110 mq | 183.800 | **254.000** | 206.100 | 50.800 |
+| Centro 110 mq | 197.600 | **269.000** | 221.100 | 53.800 |
+
+**Cassa totale da avere pronta**, incluse riserva di gestione (5%) e costo dei
+cicli a vuoto (4.000–16.000 €):
+
+| Scenario | Cassa totale |
+|---|---|
+| Taglio medio (70 mq) | **172.000 – 195.000 €** |
+| Taglio grande (110 mq) | **272.000 – 298.000 €** |
+
+Entrambi dentro la fascia dichiarata. Il taglio grande in Centro è al limite
+superiore e richiede **221.000 € liquidi entro 120 giorni**.
 
 > **Vincolo duro da presidiare (rischio R5).** Il termine di saldo è tipicamente
-> **120 giorni dall'aggiudicazione e non è prorogabile**. Fra la cauzione (10%
-> dell'offerta) e il saldo passano poche settimane, in cui vanno mobilitati
-> oltre 100.000 €. Mancare quel termine significa perdere **cauzione e
-> immobile**. Il tempo di mobilitazione va accertato prima della prima offerta,
-> non dopo (task F4.7).
+> **120 giorni dall'aggiudicazione e non è prorogabile**. Fra cauzione (10%) e
+> saldo passano poche settimane. Mancare quel termine significa perdere
+> **cauzione e immobile**. Il dato che decide se questo piano regge non è il
+> totale, è **quanto del capitale è liquido entro 120 giorni**:
+>
+> | Liquidità entro 120 gg | Perimetro accessibile |
+> |---|---|
+> | ≥ 221.000 € | tutto, compresi i tagli grandi in Centro |
+> | ≥ 137.000 € | tagli medi in tutte le zone core |
+> | < 127.000 € | va rivista la fascia di prezzo, non il ROI |
 
 ---
 
@@ -41,20 +68,28 @@ Entrambi dentro la fascia dichiarata, con margine sui tagli medi.
 | Metrica | Soglia |
 |---|---|
 | ROI su capitale, **scenario prudente** | **≥ 20%** |
-| Durata dall'aggiudicazione all'incasso | **≤ 12 mesi** *(vincolo rigido)* |
+| Durata dall'aggiudicazione all'incasso | **≤ 12 mesi** *(vincolo rigido — vedi nota)* |
 | Capitale massimo al picco | 350.000 € |
 | Margine di sicurezza sul prezzo di uscita | ≥ 12% |
 
-**Metrica prevalente: ROI annualizzato.** *(assunta, non dichiarata
-esplicitamente — vedi Punti aperti)* La scelta di un orizzonte rigido a 12 mesi
-implica che conti il rendimento per unità di tempo, non il margine assoluto.
+**Metrica prevalente: ROI annualizzato.** *(assunta — l'orizzonte rigido implica
+che conti il rendimento per unità di tempo)*
+
+> **Nota sul vincolo dei 12 mesi.** Con le durate riviste, la rinfrescata in
+> zona core richiede **13 mesi** fino all'incasso, non 12. Il vincolo dei 12
+> mesi è quindi **superato di un mese nello scenario prudente** e rispettato
+> solo se saldo e pratiche filano senza intoppi.
+>
+> Non ho abbassato il vincolo a 13 mesi né rilassato la soglia: il modello gira
+> su 13 mesi reali e il ROI annualizzato che ne esce (**18,3%**) è il numero
+> onesto. La differenza fra i 12 mesi desiderati e i 13 effettivi è un mese di
+> scarto da sapere, non da nascondere ritoccando i parametri.
 
 ---
 
 ## Intento
 
-**Rivendita dopo ristrutturazione.** È il perimetro nativo del sistema: modello
-ROI, tre scenari di uscita, plusvalenza infra-quinquennale.
+**Rivendita dopo ristrutturazione leggera.** Perimetro nativo del sistema.
 
 Conseguenze fiscali attive:
 - Imposta di registro **9%** + 100 € fisse (non prima casa)
@@ -65,75 +100,131 @@ Conseguenze fiscali attive:
 
 ---
 
-## Tolleranza
+## Tolleranza e livelli di intervento
 
 | Dimensione | Posizione |
 |---|---|
 | **Immobile occupato dal debitore** | **Escluso** — solo immobili liberi |
-| Livello massimo di cantiere | Straordinaria (distribuzione invariata) |
-| Livello preferito | **Rinfrescata** |
+| **Livello di intervento** | **Rinfrescata** (unico binario ordinario) |
+| **Straordinaria** | **Solo rimedio** — vedi decisione sotto |
+| Integrale, ridistribuzione, premium | Esclusi |
 | Invenduto oltre 3 mesi | `[DA DEFINIRE]` — gate G6 |
 
-### Conflitto risolto in sede di intervista
+### Decisione 1 — La straordinaria è declassata a solo-rimedio
 
-Le risposte iniziali contenevano una contraddizione: *"12 mesi di orizzonte"* e
-*"immobili occupati accettati se prezzati"*. Non stanno insieme.
+**Il numero.** Lo spread di prezzo fra "buono stato" (esito di una rinfrescata)
+e "ristrutturato" (esito di una straordinaria) sul mercato fiorentino è
+**+5% / +7% / +10%** nei tre scenari. Il break-even ne richiede **+11,5%**:
 
-Scomposizione di una durata a 12 mesi su un immobile occupato:
-
-| Fase | Mesi |
+| | |
 |---|---|
-| Pratiche edilizie | 1–2 |
-| Cantiere (straordinaria) | 4–5 |
-| Vendita | 3–4 |
-| **Restano per la liberazione** | **1–4** — contro i **3–18 tipici** |
+| Costo incrementale | 600 − 250 = **350 €/mq** |
+| Ricavo incrementale, a 3.050 €/mq di base | +153 / **+214** / +305 €/mq |
+| **Spread di break-even** | **+11,5%** — sopra l'estremo alto della forchetta |
 
-**Decisione del decisore: si tengono i 12 mesi.** Di conseguenza gli immobili
-occupati sono **esclusi dal perimetro**, non prezzati.
+Negativo in **tutti e tre** gli scenari, e in più aggiunge 2–3 mesi di cantiere
+su una metrica annualizzata. Alle durate riviste il binario straordinaria
+richiede **15 mesi** e rende il **15,7%** annualizzato: fuori sia dal vincolo
+di durata sia dalla soglia di ROI.
 
-Effetto misurato sullo stesso lotto allo stesso prezzo: a 18 mesi il ROI
-annualizzato scende dal 20% al **12,9%**. È la ragione numerica della scelta.
+**Decisione.** La straordinaria **non è più la valvola per allargare il flusso
+di candidati**. Si ammette solo quando:
+1. l'immobile **non è vendibile** in stato buono, **e**
+2. lo sconto in asta finanzia **integralmente** l'intervento, **e**
+3. la durata complessiva resta verificata dal modello, non assunta.
 
-**Costo della scelta, dichiarato:** si scarta circa metà dei lotti disponibili,
-e si elimina il rischio **R1** (liberazione), che è il rischio strutturale
-dell'asta — alto in probabilità, alto in impatto e con residuo alto anche dopo
-tutte le mitigazioni.
+A parità di lotto, non si scelga mai la straordinaria sulla rinfrescata.
+
+> **Decisione revisabile.** Lo spread +5/+10% poggia su fonti **non locali**,
+> confidenza **bassa**. Il borsino Tecnocasa di Scandicci lo misura
+> direttamente per zona e stato, e potrebbe ribaltare la conclusione. È il
+> punto aperto n.2: quando diventa accessibile, questa decisione va rifatta.
+
+### Conflitto risolto in v1 — orizzonte contro occupazione
+
+Le risposte iniziali contenevano *"12 mesi di orizzonte"* e *"occupati
+accettati se prezzati"*. Su 12 mesi la liberazione avrebbe avuto 1–4 mesi
+contro i 3–18 tipici. Decisione del decisore: **si tengono i 12 mesi**, quindi
+occupati **fuori perimetro**. Costo dichiarato: si scarta circa metà dei lotti,
+ma si elimina **R1**, il rischio strutturale dell'asta.
 
 ---
 
 ## Forma dell'acquisto
 
-**Persona fisica.** È lo scenario che `roi.py` copre. Nessun adattamento del
-modello richiesto.
-
-> Se in futuro si valutasse l'acquisto tramite società, il modello va **rifatto
-> col commercialista**: IVA detraibile, immobile come merce, utile tassato come
-> reddito d'impresa invece che plusvalenza. Non è una variante, è un altro
-> progetto (`PIANO-PROGETTO.md` §11).
+**Persona fisica.** È lo scenario che `roi.py` copre. Se in futuro si valutasse
+la società, il modello va rifatto col commercialista: IVA detraibile, immobile
+come merce, utile come reddito d'impresa. Non è una variante, è un altro
+progetto (`PIANO-PROGETTO.md` §11).
 
 ---
 
 ## Perimetro
 
-**Geografia:** tutto il Comune di Scandicci. Nessun filtro di zona in questa
-fase — il vincolo effettivo è la scarsità di lotti liberi in buono stato, non
-la geografia. Il `procacciatore` riporta comunque la **zona omogenea** di ogni
-candidato, perché il prezzo di uscita si stima per zona.
+**Geografia: tutto il Comune di Scandicci** per la *ricerca* — il vincolo vero
+è la scarsità di lotti liberi in buono stato, e restringere la geografia
+ridurrebbe un flusso già sottile.
 
-**Tipologia:** qualsiasi taglio residenziale, **incluse unità indipendenti e
-villette**.
+Ma le zone **non sono equivalenti**, e la differenza non è nel prezzo: è nei
+**tempi di assorbimento**, che con un orizzonte rigido sono il vincolo. Quindi
+la soglia è zona-dipendente, non unica.
 
-Nota sulle unità indipendenti: nessuna esposizione ex art. 63 disp. att. c.c.
-(arretrati condominiali e lavori deliberati) — che è il rischio **R6** eliminato
-— ma imprevisti strutturali più alti e mercato più sottile in uscita. Il
-`geometra` è istruito ad alzare la riserva imprevisti su questa tipologia.
+### Decisione 3 — Soglie per zona
 
-**Esclusioni assolute:**
+Rinfrescata (250 €/mq), immobile libero, ROI 20% prudente. Uscita da referto
+`mercato-scandicci` 19/09/2026 — **prezzi richiesti deflazionati −8%,
+confidenza bassa**.
+
+| Zona | Uscita €/mq | Assorbimento | Mesi totali | Base max 70 mq | Base max 110 mq | Perimetro |
+|---|---|---|---|---|---|---|
+| **Centro** | 3.260 | 3–4 mesi | 13 | **2.234** | **2.361** | ✅ core |
+| **Casellina** | 3.080 | 3–4 mesi | 13 | **2.067** | **2.194** | ✅ core |
+| Badia a Settimo / S. Colombano | 3.110 | 4–6 mesi | 15 | 2.086 | 2.216 | ⚠️ seconda scelta |
+| Le Bagnese / San Giusto | 2.930 | 4–6 mesi | 15 | 1.919 | 2.049 | ⚠️ seconda scelta |
+| Mosciano / Casignano / Giogoli | 3.440 | 6+ mesi | 17 | 2.383 | 2.517 | ❌ fuori orizzonte |
+| S. Vincenzo a Torri / Marciola | 2.580 | 6+ mesi | 17 | 1.585 | 1.719 | ❌ fuori orizzonte |
+
+> **Attenzione a come si legge questa tabella.** Mosciano ha la **soglia più
+> alta** — 2.383 €/mq — perché ha i €/mq di uscita più alti del comune. Ma ha
+> anche i tempi peggiori: 17 mesi totali contro un vincolo di 12. **La soglia
+> da sola direbbe "vai"; l'orizzonte dice no.** Il filtro è la combinazione
+> delle due colonne, non la soglia isolata.
+>
+> Con metrica annualizzata, un €/mq di uscita alto non compensa un
+> assorbimento lento. È il contrario dell'intuizione, e vale la pena ricordarlo
+> quando un lotto in collina sembrerà attraente.
+
+La classificazione dell'assorbimento per zona è **inferenza su proxy di
+liquidità** (profondità del segmento, corridoio tramviario T1, ticket medio),
+confidenza **bassa**. Il dato per zona non esiste pubblicamente: solo le
+agenzie locali lo hanno.
+
+### Tipologia
+
+Qualsiasi taglio residenziale, con una **regola nuova sugli indipendenti**.
+
+Il referto ha trovato che sugli indipendenti il differenziale **non è di
+tipologia ma di taglio**:
+
+| Taglio | €/mq richiesti | Regola |
+|---|---|---|
+| Indipendenti **< 100 mq** | 3.700+ | **In perimetro**, e si applica un **premio**, non uno sconto |
+| Indipendenti **> 130 mq** | 2.100 – 2.400 | **Fuori perimetro** con 12 mesi di orizzonte, salvo sconto d'asta eccezionale |
+
+Sopra i 130 mq il ticket assoluto supera i 350.000 €, la platea si assottiglia
+e i tempi vanno all'estremo alto. **Non usare mai il €/mq degli appartamenti
+per un indipendente grande**: si sbaglia di decine di migliaia di euro.
+
+Resta valida l'istruzione al `geometra` di alzare la riserva imprevisti su
+questa tipologia (nessun condominio, ma imprevisti strutturali più alti).
+
+### Esclusioni assolute
 - Immobili **occupati** (da debitore o terzi)
 - Locazione opponibile, quota indivisa, diritti reali di terzi
 - Abusi **non sanabili**
-- Interventi che richiedano **ridistribuzione** o livelli superiori alla
-  straordinaria
+- Ridistribuzione, integrale, premium
+- Indipendenti oltre 130 mq
+- Zone a assorbimento 6+ mesi (Mosciano-Giogoli, S. Vincenzo a Torri)
 - Terreni, box isolati, immobili commerciali e produttivi
 
 ---
@@ -148,108 +239,92 @@ Nota sulle unità indipendenti: nessuna esposizione ex art. 63 disp. att. c.c.
 | Commercialista | da individuare |
 | Agenzia immobiliare | da individuare |
 
-Il tecnico disponibile è un vantaggio operativo concreto: permette il
-**sopralluogo con il custode prima dell'asta**, che è la verifica che alza di
-più la confidenza del computo (task F3.6 e F3.8).
+Il tecnico disponibile permette il **sopralluogo con il custode prima
+dell'asta** (F3.6, F3.8): la verifica che alza di più la confidenza del computo.
 
-L'impresa mancante è rilevante con un orizzonte di 12 mesi: senza impresa pronta
-si perdono **4–6 settimane** fra capitolato, gare e contratto. Va nel
-cronoprogramma di F0, non scoperto in F8.
+Con il declassamento della straordinaria, il peso dell'impresa cala: una
+rinfrescata è un cantiere leggero. Ma serve comunque, e con 13 mesi di durata
+effettiva le 4–6 settimane di ricerca vanno in F0, non scoperte in F8.
 
 ---
 
-## Soglie di screening derivate
+## Decisione 2 — Durate riviste nel modello
 
-Filtro che il `procacciatore` applica: **il prezzo base al mq deve stare sotto
-la soglia**. Tutti gli immobili sono liberi per perimetro; ROI target 20%
-sullo scenario prudente.
+`strumenti/soglie.py`: `MESI_LIBERO` **11 → 13**, `MESI_OCCUPATO` **18 → 20**.
 
-### Binario preferito — rinfrescata (250 €/mq, 9 mesi)
+**Il rilevamento.** I tempi di vendita pubblicati (~109 giorni, hinterland di
+Firenze, Tecnocasa gen 2026) misurano il collocamento fino alla **proposta
+accettata**, non fino al rogito. Lo scarto proposta → atto → incasso vale altri
+2–3 mesi, che il modello non contava:
 
-| Uscita €/mq | 70 mq | % uscita | 110 mq | % uscita |
-|---|---|---|---|---|
-| 2.600 | 1.693 | 65% | 1.794 | 69% |
-| 2.900 | 1.971 | 68% | 2.072 | 71% |
-| 3.200 | 2.250 | 70% | 2.351 | 73% |
-| 3.500 | 2.528 | 72% | 2.629 | 75% |
+| Fase | Mesi |
+|---|---|
+| Collocamento fino a proposta accettata | 3,6 |
+| Proposta → rogito → incasso | 2,0 – 3,0 |
+| **Uscita fino all'incasso** | **5,6 – 6,6** *(il modello assumeva 3–4)* |
 
-ROI annualizzato al tetto d'offerta: **27,5%**
+**Effetto.** ROI annualizzato dal 22,0% al **18,3%**; tetti d'offerta quasi
+invariati (−10 €/mq circa). Il costo della correzione è quasi tutto sul
+rendimento dichiarato, non sulla capacità d'offerta — cioè era una
+sopravvalutazione del rendimento, non un errore di prezzo.
 
-### Binario accettato — straordinaria (600 €/mq, 12 mesi)
+Aggiunto l'override `--mesi` per applicare durate zona-specifiche, e due test
+(`test_durata_override`, `test_durate_riviste`) che impediscono di riportare
+silenziosamente le durate ai valori ottimistici.
 
-| Uscita €/mq | 70 mq | % uscita | 110 mq | % uscita |
-|---|---|---|---|---|
-| 2.600 | 1.009 | 39% | 1.135 | 44% |
-| 2.900 | 1.288 | 44% | 1.413 | 49% |
-| 3.200 | 1.566 | 49% | 1.691 | 53% |
-| 3.500 | 1.844 | 53% | 1.970 | 56% |
-
-ROI annualizzato al tetto d'offerta: **20,0%**
-
-### Come si leggono
-1. Il `procacciatore` colloca il lotto nella sua **zona omogenea** e ne ricava
-   il €/mq del ristrutturato per quella zona.
-2. Sceglie la riga di uscita più vicina e la colonna di metratura.
-3. Confronta il **prezzo base al mq** del lotto con la soglia.
-4. Sopra soglia → scarto. Sotto soglia → candidato, non affare.
-
-I costi fissi non scalano coi metri quadri: **le metrature maggiori hanno una
-soglia percentuale più generosa.** Per metrature intermedie o valori di uscita
-diversi, ricalcolare:
-
-```bash
-python3 flipping-scandicci/strumenti/soglie.py --uscita-mq <X> --roi 0.20 \
-        --mq <mq> --libero --costo-mq <250 o 600>
-```
-
-### Osservazione strategica: dove si è spostato il rischio
-
-La rinfrescata è **più efficiente per mese e per euro** — 27,5% annualizzato
-contro 20% — perché l'operazione è più breve e più leggera. Il filtro è anche
-più permissivo (70% del valore di uscita contro 49%).
-
-Ma lo sconto in asta viene da tre cose: **occupazione, cattivo stato,
-complessità legale.** Questo profilo esclude la prima, preferisce evitare la
-seconda e scarta la terza.
-
-**Conseguenza:** il collo di bottiglia non è l'economia dell'operazione, è il
-**flusso di lotti**. Gli immobili liberi e in buono stato sono la categoria più
-rara e più contesa in asta. Il rischio dominante di questo profilo non è **R2**
-(sforo di cantiere) né **R1** (liberazione, eliminato): è **R13** —
-*aggiudicazione a un rilancio superiore di terzi*.
-
-Va gestito così:
-- mettere in conto **tornate senza un solo candidato**: è il funzionamento
-  normale di questo profilo, non un malfunzionamento;
-- il binario "straordinaria accettata" è la valvola che allarga il flusso
-  quando la rinfrescata non produce candidati;
-- la disciplina sul tetto d'offerta (**R8**) diventa ancora più critica: su
-  lotti contesi la tentazione di superare la soglia è massima.
+> **Ambiguità residua.** Non è accertato se i 109 giorni Tecnocasa arrivino alla
+> proposta o al rogito: le due letture divergono di 2–3 mesi. **Una telefonata
+> all'Ufficio Studi Tecnocasa lo risolve.** Ho adottato la lettura prudente.
 
 ---
 
 ## Punti aperti
 
-| # | Punto | Assunzione adottata | Impatto se sbagliata |
+| # | Punto | Assunzione adottata | Impatto |
 |---|---|---|---|
-| 1 | **Valori €/mq reali per zona di Scandicci** | Soglie parametrizzate su 2.600–3.500 €/mq | Alto: sposta tutte le soglie. Prima azione di `mercato-scandicci` in F1 |
-| 2 | Tempo di mobilitazione del capitale | Non accertato | **Critico (R5)**: da confermare prima della prima offerta |
-| 3 | Metrica prevalente | Assunta **annualizzata**, dedotta dall'orizzonte rigido | Medio: cambia la preferenza fra operazioni brevi e margini assoluti |
-| 4 | Leva finanziaria | Assunta nessuna | Medio: la leva riduce il capitale proprio e alza il ROI, ma aggiunge oneri |
-| 5 | Politica su invenduto oltre 3 mesi | Non definita | Medio: è la decisione del gate G6 |
-| 6 | Costo/mq reale per rinfrescata e straordinaria | 250 e 600 €/mq parametrici | Alto sulle soglie. Da tarare con due preventivi reali del tecnico |
+| **1** | **Valori OMI 2S2025 per zona** | Prezzi richiesti dei portali, deflazionati −8%. Confidenza **bassa** | **Alto** — è il denominatore di ogni soglia |
+| **2** | Borsino Tecnocasa per zona **e stato** | Spread buono→ristrutturato +5/+7/+10% da fonti non locali | **Alto** — può ribaltare la decisione 1 |
+| 3 | Metodologia dei tempi di vendita Tecnocasa | Lettura prudente: fino alla proposta | Medio — decide la validità della decisione 2 |
+| 4 | Tempo di mobilitazione del capitale | Non accertato | **Critico (R5)** — presidiato dal decisore |
+| 5 | Comparabili **realizzati** per zona | Nessuno. Solo richiesti deflazionati | **Alto** — serve per un rilancio vincolante |
+| 6 | Tempi di assorbimento per zona | Inferenza su proxy di liquidità, confidenza bassa | Alto — determina la classificazione del perimetro |
+| 7 | Costo/mq reale per la rinfrescata | 250 €/mq parametrico | Alto — da tarare con due preventivi del tecnico |
+| 8 | Criterio di ragguaglio delle superfici | I €/mq dei portali usano superfici dichiarate, le perizie ragguagli espliciti | Medio, **segno incerto** — ricalcolare sul primo lotto reale |
 
-**Priorità:** i punti 1 e 2 vanno chiusi prima di una qualsiasi offerta
-vincolante. Il punto 1 è il primo incarico da dare a `mercato-scandicci`; il
-punto 2 dipende solo dal decisore.
+### Sul punto 1 — perché è bloccato e come si sblocca
+
+La banca dati OMI, il borsino Tecnocasa, i portali aste e il sito del Comune
+sono **bloccati dalla policy di rete aziendale di questa sessione**: verificato
+con `curl`, 403 in CONNECT su tutti e quattro i domini.
+
+**Non è un limite del metodo.** Su una macchina personale, fuori dalla rete
+aziendale, `mercato-scandicci` raggiunge OMI senza ostacoli. Il modo più rapido
+di chiudere il punto 1 è:
+
+```bash
+git clone https://github.com/MattPerro/Claude-Repository.git
+cd Claude-Repository && claude
+# poi: "chiedi a mercato-scandicci di mappare le zone OMI di Scandicci"
+```
+
+Consultazione OMI gratuita e senza login: *Agenzia delle Entrate → Quotazioni
+immobiliari → Consultazione per indirizzo*, oppure l'app **OMI Mobile**.
+
+**Finché il punto 1 è aperto: le soglie servono per lo screening, non per un
+rilancio vincolante.** Prima di un'offerta, due agenzie locali.
 
 ---
 
 ## Prossimi passi
 
-1. `mercato-scandicci` — mappare i €/mq per zona omogenea di Scandicci e
-   sostituire le soglie parametriche con quelle reali *(chiude il punto aperto 1)*
-2. `/monitora-aste` con `/loop 1d` — avviare la sorveglianza sulle
-   pubblicazioni, filtro sui soli immobili liberi
-3. Accertare il tempo di mobilitazione del capitale *(chiude il punto 2)*
-4. Individuare l'impresa esecutrice *(4–6 settimane, non rinviabile a F8)*
+| # | Azione | Chi | Sblocca |
+|---|---|---|---|
+| 1 | Rieseguire `mercato-scandicci` da rete non filtrata | decisore + sistema | Punti 1, 2, 5 |
+| 2 | Telefonata all'Ufficio Studi Tecnocasa sui tempi di vendita | decisore | Punto 3 |
+| 3 | Accertare la liquidità entro 120 giorni | decisore | Punto 4 (critico) |
+| 4 | Due preventivi di rinfrescata al tecnico disponibile | tecnico | Punto 7 |
+| 5 | `/monitora-aste` con `/loop 1d`, filtro su liberi in zone core | sistema | Avvia il flusso |
+| 6 | Individuare l'impresa esecutrice | decisore | F0, non rinviabile |
+
+Il passo 1 è quello che cambia più cose: chiude tre punti aperti in un colpo e
+porta la confidenza delle soglie da bassa a media.

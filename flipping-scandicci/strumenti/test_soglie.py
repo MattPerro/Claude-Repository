@@ -109,6 +109,41 @@ def test_roi_irraggiungibile_non_e_aggredibile() -> None:
              f"soglia {r['base_massimo_mq']:.0f}")
 
 
+def test_durata_override() -> None:
+    """La durata si puo' imporre: serve per le zone ad assorbimento lento."""
+    corta = soglia_screening(0.20, USCITA, libero=True, costo_mq=250.0, mesi=13.0)
+    lunga = soglia_screening(0.20, USCITA, libero=True, costo_mq=250.0, mesi=20.0)
+    verifica(
+        "una durata maggiore abbassa la soglia",
+        lunga["base_massimo_mq"] < corta["base_massimo_mq"],
+        f"{lunga['base_massimo_mq']:.0f} vs {corta['base_massimo_mq']:.0f}",
+    )
+    default = soglia_screening(0.20, USCITA, libero=True, costo_mq=250.0)
+    verifica(
+        "senza override si usa MESI_LIBERO",
+        abs(default["base_massimo_mq"] - corta["base_massimo_mq"]) < 1.0,
+        f"default {default['base_massimo_mq']:.0f} vs 13 mesi {corta['base_massimo_mq']:.0f}",
+    )
+
+
+def test_durate_riviste() -> None:
+    """Le durate di default incorporano la revisione del 19/09/2026.
+
+    La fase di uscita era sottostimata di 2-3 mesi: i tempi di vendita
+    pubblicati misurano il collocamento fino alla proposta accettata, non
+    fino al rogito. Se qualcuno le riporta ai valori precedenti (11/18),
+    le soglie tornano ottimistiche senza che nessuno se ne accorga.
+    """
+    from soglie import MESI_LIBERO, MESI_OCCUPATO
+
+    verifica("MESI_LIBERO e' 13, non 11", MESI_LIBERO == 13.0, str(MESI_LIBERO))
+    verifica("MESI_OCCUPATO e' 20, non 18", MESI_OCCUPATO == 20.0, str(MESI_OCCUPATO))
+    verifica(
+        "l'occupato resta piu' lungo del libero di almeno 5 mesi",
+        MESI_OCCUPATO - MESI_LIBERO >= 5.0,
+    )
+
+
 def test_tabella_completa() -> None:
     t = tabella(USCITA)
     verifica("la tabella ha 10 righe (5 ROI x 2 stati)", len(t) == 10, str(len(t)))

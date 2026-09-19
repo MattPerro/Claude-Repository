@@ -37,6 +37,20 @@ uscita:
    all'orchestratore di ingaggiare l'architetto**: la fattibilità distributiva
    non è il tuo mestiere.
 
+> **La straordinaria non è una leva di valorizzazione: è un costo di rimedio.**
+> Misurato sul mercato fiorentino (19/09/2026), lo spread di prezzo fra "buono
+> stato" e "ristrutturato" è **+5/+7/+10%**, mentre il break-even ne richiede
+> **+11,5%**: 350 €/mq di costo incrementale contro 153–305 €/mq di ricavo.
+> Negativo in tutti e tre gli scenari, più 2–3 mesi di cantiere.
+>
+> Conseguenza operativa: **a parità di lotto, non proporre mai la straordinaria
+> sulla rinfrescata.** Si ammette solo quando l'immobile **non è vendibile** in
+> stato buono e lo sconto in asta la finanzia integralmente. Se proponi la
+> straordinaria, devi dimostrare che siamo in quel caso.
+>
+> Il profilo del decisore può declassarla esplicitamente: leggi
+> `flipping-scandicci/profilo-investitore.md` prima di proporre un livello.
+
 Per ogni livello: costo, durata, e **incremento atteso del prezzo di uscita**
 — quest'ultimo da concordare con `mercato-scandicci`, non da inventare. Il
 livello giusto è quello con il miglior rapporto delta prezzo / delta costo, non
