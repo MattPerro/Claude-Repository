@@ -33,3 +33,6 @@ export * from './engine/shortenSession.js';
 export * from './engine/engine.js';
 
 export * from './timer/timer.js';
+
+export * from './theme/contrast.js';
+export * from './theme/palette.js';

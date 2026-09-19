@@ -1,9 +1,12 @@
 /**
  * Profilo, impostazioni e archivio personale.
  *
- * I valori dichiarati da Mattia (183 cm, 100 kg iniziali) sono una
- * CONFIGURAZIONE INIZIALE modificabile, non misurazioni datate: la specifica
- * (§15) vieta di trasformare il peso di profilo in una pesata.
+ * Il peso dichiarato in profilo e' una CONFIGURAZIONE INIZIALE modificabile,
+ * non una misurazione datata: la specifica (§13.2) vieta di trasformarlo in
+ * una pesata, e quindi non compare nei grafici ne' nella media mobile.
+ *
+ * Nessun dato personale reale e' scritto in questo file: vedi il commento di
+ * `NEUTRAL_ONBOARDING` in fondo.
  */
 
 import type { IsoWeekday, Instant, LocalDate, TimeZone } from '../time.js';
@@ -38,7 +41,7 @@ export interface Device {
  * Obiettivo corporeo.
  *
  * `targetKg` e' un riferimento, non una promessa: l'app non indica una data
- * certa per raggiungerlo (specifica §15).
+ * certa per raggiungerlo (specifica §13.2).
  */
 export interface BodyGoal {
   readonly targetKg: number;
@@ -64,7 +67,7 @@ export interface Profile {
   readonly sportGoal: string | null;
   /** Data di avvio del percorso. */
   readonly programStartDate: LocalDate;
-  /** Giorni PROPOSTI per le sedute. Proposti, non imposti (specifica §3). */
+  /** Giorni PROPOSTI per le sedute. Proposti, non imposti (specifica §2). */
   readonly preferredWeekdays: readonly IsoWeekday[];
   /** Minuti disponibili per seduta, doccia esclusa. */
   readonly availableMinutesPerSession: number;
@@ -126,7 +129,7 @@ export interface AppSettings {
  *
  * Tutti i valori sensibili alla privacy partono DISATTIVATI: nessuna
  * telemetria, nessun coach esterno, nessuna sincronizzazione di foto
- * (specifica §16).
+ * (specifica §14).
  */
 export function defaultSettings(workspaceId: string, timeZone: TimeZone): AppSettings {
   return {
@@ -137,7 +140,7 @@ export function defaultSettings(workspaceId: string, timeZone: TimeZone): AppSet
     hapticsEnabled: true,
     restTimerNotifications: true,
     sessionReminders: true,
-    // Riferimento prudenziale del piano, configurabile (specifica §15).
+    // Riferimento prudenziale del piano, configurabile (specifica §13.4).
     hoursBeforeTrackDay: 72,
     autoSyncEnabled: true,
     autoSyncMinIntervalMinutes: 15,
@@ -150,42 +153,72 @@ export function defaultSettings(workspaceId: string, timeZone: TimeZone): AppSet
 }
 
 /**
- * Profilo iniziale di Mattia come CONFIGURAZIONE proposta in onboarding.
+ * Valori proposti in onboarding.
  *
- * Questi valori vengono mostrati precompilati nella schermata di conferma e
- * sono tutti modificabili. Non finiscono nei dati demo, nei log o nei file
- * pubblicabili (specifica §3): qui ci sono solo i dati che Mattia ha
- * dichiarato nella specifica stessa, e nessuna deduzione (eta', patologie,
- * percentuale di grasso, frequenza cardiaca, carichi iniziali).
+ * ---------------------------------------------------------------------------
+ * QUI NON CI SONO DATI PERSONALI, ED E' DELIBERATO.
+ *
+ * La specifica (§2) chiede di usare i dati dichiarati da Mattia per una
+ * configurazione iniziale locale modificabile, e nello stesso punto vieta di
+ * inserirli "nei dati demo, nei log o nei file pubblicabili", chiedendo che
+ * gli eventuali file di bootstrap personale restino esclusi da Git.
+ *
+ * Questo file e' tracciato in un repository: e' un file pubblicabile. Quindi
+ * altezza, peso e nome NON stanno qui. Ci stanno il TIPO e i valori neutri.
+ *
+ * I dati reali arrivano da una delle due strade:
+ *
+ *  1. **Onboarding** (sempre disponibile): Mattia li inserisce una volta al
+ *     primo avvio e finiscono nel database locale, che non e' in Git.
+ *  2. **Bootstrap locale** (comodita' opzionale): un file
+ *     `apps/mobile/src/bootstrap.local.ts`, escluso da Git tramite
+ *     `.gitignore`, che precompila l'onboarding. Il modello da copiare e'
+ *     `apps/mobile/src/bootstrap.local.example.ts`.
+ *
+ * In entrambi i casi i valori restano modificabili in qualsiasi momento.
+ * ---------------------------------------------------------------------------
  */
 export interface OnboardingDefaults {
   readonly displayName: string;
-  readonly heightCm: number;
-  readonly declaredWeightKg: number;
-  readonly bodyGoal: BodyGoal;
-  readonly sportGoal: string;
+  readonly heightCm: number | null;
+  readonly declaredWeightKg: number | null;
+  readonly bodyGoal: BodyGoal | null;
+  readonly sportGoal: string | null;
   readonly preferredWeekdays: readonly IsoWeekday[];
   readonly availableMinutesPerSession: number;
   readonly sessionsPerWeek: number;
-  readonly context: string;
+  readonly context: string | null;
 }
 
-export const ONBOARDING_DEFAULTS: OnboardingDefaults = {
-  displayName: 'Mattia',
-  heightCm: 183,
-  declaredWeightKg: 100,
-  bodyGoal: {
-    targetKg: 90,
-    stretchTargetKg: 85,
-    note:
-      "90 kg e' l'obiettivo di riferimento migliorando la composizione corporea. " +
-      "85 kg e' un riferimento eventuale, non un obbligo, e l'app non indica una data certa.",
-  },
-  sportGoal:
-    'Forza e preparazione atletica generale utili alla guida amatoriale di una moto in pista.',
-  // Lunedi' e giovedi': PROPOSTI, non imposti (specifica §3).
+/**
+ * Onboarding neutro: nessun dato personale, solo le impostazioni strutturali
+ * del progetto (due sedute a settimana, 70 minuti, lunedi' e giovedi'
+ * PROPOSTI e non imposti).
+ *
+ * I campi lasciati a `null` compaiono vuoti nella schermata di onboarding.
+ */
+export const NEUTRAL_ONBOARDING: OnboardingDefaults = {
+  displayName: '',
+  heightCm: null,
+  declaredWeightKg: null,
+  bodyGoal: null,
+  sportGoal: null,
+  // Proposti, non imposti (specifica §2).
   preferredWeekdays: [1, 4],
   availableMinutesPerSession: 70,
   sessionsPerWeek: 2,
-  context: 'Rientro dopo circa quattro anni senza allenamento.',
+  context: null,
 };
+
+/**
+ * Unisce un eventuale bootstrap locale ai valori neutri.
+ *
+ * Se il file locale non esiste (il caso normale per chiunque cloni il
+ * repository) l'onboarding parte vuoto e non si rompe niente.
+ */
+export function resolveOnboardingDefaults(
+  local: Partial<OnboardingDefaults> | null | undefined,
+): OnboardingDefaults {
+  if (local === null || local === undefined) return NEUTRAL_ONBOARDING;
+  return { ...NEUTRAL_ONBOARDING, ...local };
+}

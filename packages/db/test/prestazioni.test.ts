@@ -259,6 +259,15 @@ describe('archivio sintetico di tre anni', () => {
         expect(esito.inserted).toBe(true);
       }
 
+      // --- Media mobile a 7 giorni su 500 misurazioni -----------------------
+      const tempiMedia: number[] = [];
+      for (let i = 0; i < 10; i += 1) {
+        const t = performance.now();
+        const punti = ctx.repos.measurements.movingAverage('weightKg');
+        tempiMedia.push(performance.now() - t);
+        expect(punti).toHaveLength(MISURAZIONI);
+      }
+
       const rapporto = {
         archivio: {
           ...conteggi,
@@ -275,6 +284,11 @@ describe('archivio sintetico di tre anni', () => {
           mediana: Number(mediana(tempiQuery).toFixed(3)),
           massimo: Number(Math.max(...tempiQuery).toFixed(3)),
           medio: Number((tempiQuery.reduce((a, b) => a + b, 0) / tempiQuery.length).toFixed(3)),
+        },
+        mediaMobile7gMs: {
+          mediana: Number(mediana(tempiMedia).toFixed(3)),
+          massimo: Number(Math.max(...tempiMedia).toFixed(3)),
+          punti: MISURAZIONI,
         },
       };
       // Stampato di proposito: il rapporto del lavoro deve riportare numeri

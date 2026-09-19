@@ -157,25 +157,40 @@ export function createMeasurementRepository(db: Database): MeasurementRepository
       const days = [...perDay.keys()].sort();
       const points: MovingAveragePoint[] = [];
 
-      for (const day of days) {
+      // Finestra scorrevole su due indici invece di una scansione per ogni
+      // giorno: su tre anni di pesate quotidiane la differenza fra O(n) e
+      // O(n^2) e' visibile all'apertura del grafico.
+      let left = 0;
+      let sumOfDailyMeans = 0;
+      let observations = 0;
+
+      for (let right = 0; right < days.length; right += 1) {
+        const day = days[right];
+        if (day === undefined) continue;
+        const entry = perDay.get(day);
+        if (entry === undefined) continue;
+        sumOfDailyMeans += entry.sum / entry.count;
+        observations += entry.count;
+
         const from = addDays(day, -(windowDays - 1));
-        let sum = 0;
-        let observations = 0;
-        let daysWithData = 0;
-        for (const candidate of days) {
-          if (candidate < from || candidate > day) continue;
-          const entry = perDay.get(candidate);
-          if (entry === undefined) continue;
-          sum += entry.sum / entry.count;
-          observations += entry.count;
-          daysWithData += 1;
+        while (left <= right) {
+          const oldest = days[left];
+          if (oldest === undefined || oldest >= from) break;
+          const leaving = perDay.get(oldest);
+          if (leaving !== undefined) {
+            sumOfDailyMeans -= leaving.sum / leaving.count;
+            observations -= leaving.count;
+          }
+          left += 1;
         }
-        if (daysWithData === 0) continue; // non puo' accadere: `day` ha dati.
+
+        const daysWithData = right - left + 1;
+        if (daysWithData <= 0) continue; // non puo' accadere: `day` ha dati.
         points.push({
           date: day,
           // Media dei GIORNI con dati nella finestra. I giorni senza pesata
           // non compaiono ne' come zero ne' come valore interpolato.
-          average: Math.round((sum / daysWithData) * 100) / 100,
+          average: Math.round((sumOfDailyMeans / daysWithData) * 100) / 100,
           observationCount: observations,
         });
       }

@@ -25,6 +25,7 @@ personal/
 *.personal.json
 *.personal.ts
 bootstrap.local.*
+!**/bootstrap.local.example.ts
 
 # Database operativi e backup
 *.db
