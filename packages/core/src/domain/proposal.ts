@@ -113,7 +113,8 @@ export interface MissingInformation {
     | 'noRirDeclared'
     | 'noTechniqueDeclared'
     | 'notEnoughExposures'
-    | 'noEquipmentStep'
+    | 'unconfirmedEquipmentStep'
+    | 'noLoadStepAvailable'
     | 'noComparableHistory'
     | 'noLoadRecorded';
   readonly description: string;
@@ -126,8 +127,10 @@ export const MISSING_INFO_TEXT: Record<MissingInformation['code'], string> = {
     "La tecnica non e' stata dichiarata: un incremento richiede che l'esecuzione sia stata controllata.",
   notEnoughExposures:
     "Serve una seconda esposizione confrontabile per confermare il risultato: un singolo allenamento non basta.",
-  noEquipmentStep:
-    "L'incremento minimo di questo attrezzo non e' configurato: non e' possibile proporre un carico realmente impostabile.",
+  unconfirmedEquipmentStep:
+    "L'incremento minimo di questo attrezzo non e' ancora stato configurato: la proposta usa il valore predefinito dell'esercizio. Controlla in palestra che la macchina salga davvero di quel valore e, se e' diverso, correggilo nelle impostazioni dell'attrezzo.",
+  noLoadStepAvailable:
+    "Per questo attrezzo non e' disponibile nessun incremento di carico: non e' possibile proporre un carico realmente impostabile.",
   noComparableHistory:
     "Non esiste ancora uno storico confrontabile per questo esercizio su questo attrezzo.",
   noLoadRecorded: "Nessun carico registrato nelle serie precedenti.",

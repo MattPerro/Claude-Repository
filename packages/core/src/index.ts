@@ -20,3 +20,14 @@ export * from './domain/session.js';
 export * from './domain/profile.js';
 export * from './domain/body.js';
 export * from './domain/proposal.js';
+
+export * from './program/twelveWeeks.js';
+export * from './program/exercises.js';
+export * from './program/threeYear.js';
+export * from './program/duration.js';
+
+export * from './engine/config.js';
+export * from './engine/exposure.js';
+export * from './engine/progression.js';
+export * from './engine/shortenSession.js';
+export * from './engine/engine.js';

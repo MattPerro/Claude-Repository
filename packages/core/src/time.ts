@@ -230,10 +230,16 @@ export function calendarWeeksSpanned(from: LocalDate, to: LocalDate): number {
 /**
  * Orizzonte di pianificazione, calcolato su date reali.
  *
- * Tre anni NON sono sempre 156 settimane: a seconda della data di avvio e
- * degli anni bisestili coinvolti l'intervallo copre 156 o 157 settimane di
- * calendario. Il piano viene generato su questo numero, non su una costante
- * (specifica §8).
+ * Tre anni NON sono 156 settimane esatte. Su date reali sono 1095 o 1096
+ * giorni, a seconda che nell'intervallo cada un 29 febbraio e di come lo
+ * si attraversa: cioe' 156 settimane piene PIU' 3 o 4 giorni di resto.
+ * Le settimane di calendario lunedi'-domenica toccate sono 157 o 158 a
+ * seconda del giorno della settimana in cui si comincia.
+ *
+ * Il piano si genera su {@link totalWeeks}, che arrotonda per ECCESSO: cosi'
+ * l'ultima settimana di programma copre anche i giorni di resto e nessun
+ * giorno dell'orizzonte resta fuori dal piano. Arrotondare per difetto
+ * lascerebbe scoperti gli ultimi 3-4 giorni.
  */
 export interface PlanningHorizon {
   readonly startDate: LocalDate;
@@ -241,9 +247,17 @@ export interface PlanningHorizon {
   readonly endDateExclusive: LocalDate;
   /** Ultimo giorno coperto dal piano (inclusivo). */
   readonly lastDate: LocalDate;
+  /** Giorni reali nell'intervallo: 1095 o 1096 per tre anni. */
   readonly totalDays: number;
-  /** Settimane di programma disponibili (blocchi di 7 giorni dall'avvio). */
+  /**
+   * Settimane di programma necessarie a coprire tutto l'orizzonte
+   * (arrotondamento per eccesso). E' il numero su cui si genera il piano.
+   */
   readonly totalWeeks: number;
+  /** Settimane di 7 giorni interamente contenute nell'orizzonte. */
+  readonly completeWeeks: number;
+  /** Giorni di resto oltre le settimane piene: 3 o 4 per tre anni. */
+  readonly remainderDays: number;
   /** Settimane di calendario lunedi'-domenica toccate dall'intervallo. */
   readonly calendarWeeksSpanned: number;
 }
@@ -261,7 +275,9 @@ export function planningHorizon(startDate: LocalDate, years = 3): PlanningHorizo
     totalDays,
     // Le settimane di programma sono contate dall'avvio, non dal lunedi':
     // la settimana 1 del programma inizia il giorno in cui Mattia inizia.
-    totalWeeks: Math.floor(totalDays / 7),
+    totalWeeks: Math.ceil(totalDays / 7),
+    completeWeeks: Math.floor(totalDays / 7),
+    remainderDays: totalDays % 7,
     calendarWeeksSpanned: calendarWeeksSpanned(start, lastDate),
   };
 }

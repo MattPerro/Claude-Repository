@@ -2,7 +2,7 @@
  * Libreria degli esercizi.
  *
  * Ogni esercizio porta con se' una guida offline completa, in italiano
- * (specifica §14). Il testo deve bastare da solo: nessun video, nessun link,
+ * (specifica §12). Il testo deve bastare da solo: nessun video, nessun link,
  * nessuna illustrazione inventata.
  */
 
@@ -104,7 +104,7 @@ export interface ExerciseGuide {
   /**
    * A che cosa serve nella preparazione per la moto.
    * Formulato come finalita' della preparazione generale, non come garanzia
-   * di miglioramento sul giro (specifica §14).
+   * di miglioramento sul giro (specifica §12).
    */
   readonly motorcyclePurpose: string;
 }
@@ -134,7 +134,7 @@ export interface Exercise {
   readonly perSide: boolean;
   /**
    * true se il recupero principale va DOPO entrambi i lati.
-   * Lo step-up e' il caso previsto dalla specifica (§13).
+   * Lo step-up e' il caso previsto dalla specifica (§3.3).
    */
   readonly restAfterBothSides: boolean;
   /** Secondi stimati per una ripetizione, per la stima di durata. */
@@ -158,7 +158,7 @@ export interface Exercise {
  *
  * Esiste perche' "60 alla pressa" e' un dato privo di senso senza sapere QUALE
  * pressa: due presse diverse hanno leve e scale diverse. Il motore adattivo
- * non confronta prestazioni su istanze diverse (specifica §9).
+ * non confronta prestazioni su istanze diverse (specifica §5.3).
  */
 export interface EquipmentInstance {
   readonly id: string;
@@ -226,7 +226,7 @@ export class ExerciseLibrary {
  *
  * Errore dedicato perche' e' uno dei casi che il validatore delle proposte
  * generative deve rifiutare: un modello linguistico che inventa un esercizio
- * non deve poter scrivere nel programma (specifica §10).
+ * non deve poter scrivere nel programma (specifica §6).
  */
 export class UnknownExerciseError extends Error {
   constructor(readonly exerciseId: string) {
