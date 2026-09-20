@@ -16,9 +16,50 @@
  *   - **rese da un browser**, non da iOS.
  *
  * Non sono una verifica su dispositivo, e nessun report deve presentarle come
- * tale. Servono a cogliere i difetti che si vedono a occhio - contrasto reale,
- * gerarchia, troncamenti, testi che sbordano con i caratteri grandi - che una
- * lettura del codice non coglie.
+ * tale.
+ *
+ * ---------------------------------------------------------------------------
+ * DUE USI, E IL PRIMO E' IL PIU' UTILE
+ *
+ * 1. **Verifica che il bundle Metro si costruisca.** E' il controllo che ha
+ *    dato piu' valore, e vale anche per iOS, perche' iOS usa lo stesso
+ *    bundler. Costruire il bundle ha trovato tre difetti che `tsc` e 501 test
+ *    non potevano cogliere:
+ *
+ *      - i pacchetti locali importano con estensione `.js` (`'./units.js'`) e
+ *        Metro non la mappava sul file `.ts`: il bundle non si costruiva
+ *        affatto. Corretto in `apps/mobile/metro.config.js`.
+ *      - `openExpoSqliteAsync` usava un `import()` con specificatore calcolato
+ *        a runtime, che Metro rifiuta con un errore di sintassi. La funzione
+ *        e' stata rimossa: non serviva a nessuno.
+ *      - `.wasm` non era fra gli asset riconosciuti (solo per il web).
+ *
+ *    I primi due avrebbero fatto fallire anche `expo prebuild` + build Xcode
+ *    sul Mac. Questo banco li ha trovati prima.
+ *
+ * 2. **Acquisizione delle schermate** per la revisione visiva.
+ *
+ * ---------------------------------------------------------------------------
+ * LIMITE NOTO E NON RISOLTO
+ *
+ * In questo ambiente le schermate mostrano lo **stato di errore di avvio**,
+ * non i contenuti. Il motivo non e' un difetto dell'app: `expo-sqlite` sul web
+ * usa wa-sqlite sopra OPFS, e in Chromium **headless** la sincronizzazione del
+ * file system va in timeout. L'app, correttamente, si rifiuta di proseguire
+ * con un archivio incerto invece di generare un identificativo nuovo che
+ * duplicherebbe i dati - quindi la schermata che si vede e' proprio quel
+ * rifiuto.
+ *
+ * Tentativi effettuati e insufficienti: intestazioni COOP/COEP per
+ * `SharedArrayBuffer` (necessarie, e ora presenti), tipo MIME
+ * `application/wasm`, attesa piu' lunga, contesto persistente con directory di
+ * profilo reale.
+ *
+ * Su una macchina con un browser **non headless** (per esempio il Mac su cui
+ * si fa la build) `npm run screenshots` dovrebbe produrre le schermate dei
+ * contenuti. Finche' non accade, la revisione visiva dei contenuti resta
+ * **non effettuata**, ed e' registrata come tale in `QA_REPORT.md`.
+ * ---------------------------------------------------------------------------
  *
  * Differenze note fra il rendering web e quello iOS, da tenere presenti
  * leggendo le immagini: i font di sistema (San Francisco non e' disponibile su
@@ -49,6 +90,8 @@ const ROOT = path.resolve(HERE, '..');
 const WEB_DIR = path.join(ROOT, 'artifacts', 'web');
 const OUT_DIR = path.join(ROOT, 'artifacts', 'screenshots');
 const PORT = 8099;
+/** Profili del browser: OPFS richiede una directory di profilo reale. */
+const PROFILE_ROOT = path.join(ROOT, 'artifacts', 'browser-profiles');
 
 /**
  * Viewport dell'iPhone 15 in punti logici (393 x 852) con rapporto pixel 3.
@@ -104,6 +147,9 @@ const MIME = {
   '.ttf': 'font/ttf',
   '.woff2': 'font/woff2',
   '.map': 'application/json',
+  // Senza questo tipo il browser rifiuta la compilazione in streaming del
+  // modulo WebAssembly e ricade su un percorso piu' lento.
+  '.wasm': 'application/wasm',
 };
 
 /**
@@ -129,7 +175,16 @@ function serveStatic(dir, port) {
       res.writeHead(404).end('Not found');
       return;
     }
-    res.writeHead(200, { 'content-type': MIME[path.extname(filePath)] ?? 'application/octet-stream' });
+    res.writeHead(200, {
+      'content-type': MIME[path.extname(filePath)] ?? 'application/octet-stream',
+      // `expo-sqlite` sul web usa wa-sqlite, che richiede
+      // `SharedArrayBuffer`. Il browser lo espone solo in un contesto
+      // "cross-origin isolated", cioe' con queste due intestazioni. Senza di
+      // esse l'app si fermava con "SharedArrayBuffer is not defined".
+      'cross-origin-opener-policy': 'same-origin',
+      'cross-origin-embedder-policy': 'require-corp',
+      'cross-origin-resource-policy': 'same-origin',
+    });
     createReadStream(filePath).pipe(res);
   });
   return new Promise((resolve) => {
@@ -173,13 +228,27 @@ async function main() {
   const server = await serveStatic(WEB_DIR, PORT);
   console.log(`== Server statico su http://127.0.0.1:${String(PORT)} ==`);
 
-  const browser = await chromium.launch();
+  // Il browser e' quello fornito dall'ambiente. Playwright si aspetterebbe
+  // una revisione piu' recente e proporrebbe di scaricarla: in questo
+  // ambiente non si scaricano browser, si usa quello presente.
+  const executablePath = process.env['CHROMIUM_PATH'] ?? '/opt/pw-browsers/chromium';
+  const launchOptions = existsSync(executablePath) ? { executablePath } : {};
   const taken = [];
   const problems = [];
 
   try {
     for (const condition of CONDITIONS) {
-      const context = await browser.newContext({
+      // Contesto PERSISTENTE, con una directory di profilo su disco.
+      //
+      // Serve perche' `expo-sqlite` sul web usa wa-sqlite sopra OPFS
+      // (Origin Private File System), che richiede un profilo reale: con un
+      // contesto effimero la sincronizzazione del file system va in timeout e
+      // l'app - correttamente - si rifiuta di partire con un archivio
+      // incerto.
+      const profileDir = path.join(PROFILE_ROOT, condition.name);
+      await mkdir(profileDir, { recursive: true });
+      const context = await chromium.launchPersistentContext(profileDir, {
+        ...launchOptions,
         viewport: { width: IPHONE_15.width, height: IPHONE_15.height },
         deviceScaleFactor: IPHONE_15.deviceScaleFactor,
         colorScheme: condition.scheme,
@@ -214,7 +283,7 @@ async function main() {
         try {
           await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
           // Attesa breve per il primo rendering di react-native-web.
-          await page.waitForTimeout(1200);
+          await page.waitForTimeout(4000);
           const file = path.join(OUT_DIR, `${name}--${condition.name}.png`);
           await page.screenshot({ path: file, fullPage: false });
           taken.push(path.relative(ROOT, file));
@@ -229,7 +298,6 @@ async function main() {
       await context.close();
     }
   } finally {
-    await browser.close();
     server.close();
   }
 

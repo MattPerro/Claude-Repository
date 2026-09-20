@@ -164,6 +164,48 @@ Vedi §5.
 | Caratteri grandi, tastiera aperta, testi lunghi, stati vuoti | **C/D** | ⬜ **non verificato** |
 | Screen reader | **A** | ⚠️ etichette presenti nel codice; **mai provato con VoiceOver** |
 | Confronto fra due alternative della schermata di seduta | — | ⬜ **non effettuato**: richiesto da `SPEC.md` §9, resta da fare |
+| **Costruzione del bundle Metro** | **B** | ✅ **il bundle si costruisce** (`npm run screenshots`). Ha trovato 3 difetti che `tsc` e i test non potevano cogliere, 2 dei quali avrebbero fatto fallire anche la build iOS |
+| Acquisizione di screenshot reali | **B** parziale | ⚠️ 21 schermate acquisite senza errori di rendering, ma mostrano lo **stato di errore di avvio**: vedi §3.1 |
+
+### 3.1 Il banco degli screenshot: cosa ha dato e cosa no
+
+`npm run screenshots` esporta l'app con react-native-web, la serve e la
+acquisisce in Chromium al viewport dell'iPhone 15, in tre condizioni (tema
+scuro, tema chiaro, caratteri ingranditi).
+
+**Quello che ha dato, ed è la parte importante: il bundle Metro si costruisce.**
+È lo stesso bundler che usa iOS, quindi questo controllo vale anche per la
+build sul Mac. Costruirlo ha trovato **tre difetti** invisibili a `tsc` e ai
+501 test:
+
+| Difetto | Effetto | Valeva anche per iOS? |
+|---|---|---|
+| I pacchetti locali importano con estensione `.js` e Metro non la mappava sul file `.ts` | **il bundle non si costruiva** | **sì** |
+| `openExpoSqliteAsync` usava un `import()` con specificatore calcolato a runtime, che Metro rifiuta | **errore di sintassi in build** | **sì** |
+| `.wasm` non era fra gli asset riconosciuti | bundle web non costruibile | no, solo web |
+
+I primi due avrebbero fatto fallire `expo prebuild` + build Xcode sul Mac.
+
+**Quello che non ha dato: le schermate dei contenuti.** Le 21 immagini mostrano
+lo **stato di errore di avvio**. Non è un difetto dell'app: `expo-sqlite` sul
+web usa wa-sqlite sopra OPFS, e in Chromium **headless** la sincronizzazione
+del file system va in timeout. L'app allora si rifiuta — **correttamente** — di
+proseguire con un archivio incerto, invece di generare un identificativo di
+installazione nuovo che duplicherebbe i dati. La schermata che si vede è
+esattamente quel rifiuto, e il fatto che sia leggibile e con un comando grande
+è l'unica evidenza visiva che questo banco ha prodotto.
+
+Tentativi effettuati: intestazioni COOP/COEP per `SharedArrayBuffer`
+(necessarie, e ora presenti), tipo MIME `application/wasm`, attesa più lunga,
+contesto di browser persistente con directory di profilo reale. Nessuno
+sufficiente.
+
+Su una macchina con browser **non headless** — per esempio il Mac su cui si fa
+la build — `npm run screenshots` dovrebbe produrre le schermate dei contenuti.
+
+⬜ **La revisione visiva dei contenuti resta quindi NON EFFETTUATA**, e con essa
+il confronto fra due alternative della schermata di seduta richiesto da
+`SPEC.md` §9.
 
 ### Prestazioni
 

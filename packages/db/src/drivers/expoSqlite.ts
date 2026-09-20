@@ -79,7 +79,7 @@
  * - l'app lo INIETTA: `openExpoSqlite({ module: await import('expo-sqlite'), ... })`.
  *   L'unico posto che nomina `expo-sqlite` e' quindi `apps/mobile`, dove il
  *   bundler nativo c'e' davvero.
- * - in alternativa {@link openExpoSqliteAsync} fa l'`import()` dinamico da
+ * - i test su Node usano `openNodeSqlite()` da `@trackstrong/db/node`, da
  *   sola: resta fuori dal grafo statico e non viene mai eseguito nei test.
  */
 
@@ -150,29 +150,22 @@ export function openExpoSqlite(options: ExpoSqliteOptions): SqlDriver {
   return driver;
 }
 
-/**
- * Variante che carica `expo-sqlite` da sola, con un `import()` dinamico.
+/*
+ * RIMOSSA: `openExpoSqliteAsync`, che caricava `expo-sqlite` da sola con un
+ * `import()` dinamico dal nome costruito a runtime
+ * (`['expo','sqlite'].join('-')`).
  *
- * Il nome del modulo e' costruito a runtime, cosi' nemmeno un bundler che
- * analizza gli `import()` statici lo trascina nel grafo dei test su Node.
+ * L'intenzione era buona - non trascinare il modulo nativo nel grafo dei test
+ * su Node - ma il risultato era un difetto: **Metro rifiuta un `import()` con
+ * specificatore calcolato a runtime** e il bundle non si costruiva affatto
+ * (`SyntaxError: Invalid call ... import(specifier)`). Nessun test poteva
+ * coglierlo, perche' su Node quell'import funziona.
+ *
+ * Non serviva a nessuno: l'app inietta il modulo con
+ * `openExpoSqlite({ module: await import('expo-sqlite') })`, che e' un import
+ * statico che Metro analizza correttamente, e i test su Node usano
+ * `openNodeSqlite()` da `@trackstrong/db/node`.
  */
-export async function openExpoSqliteAsync(
-  options: Omit<ExpoSqliteOptions, 'module'>,
-): Promise<SqlDriver> {
-  const specifier = ['expo', 'sqlite'].join('-');
-  const loaded: unknown = await import(/* @vite-ignore */ specifier);
-  if (
-    typeof loaded !== 'object' ||
-    loaded === null ||
-    typeof (loaded as ExpoSqliteModule).openDatabaseSync !== 'function'
-  ) {
-    throw new Error(
-      "Il modulo 'expo-sqlite' non espone openDatabaseSync(): questo driver " +
-        'richiede un ambiente nativo Expo. Nei test usa openNodeSqlite().',
-    );
-  }
-  return openExpoSqlite({ ...options, module: loaded as ExpoSqliteModule });
-}
 
 class ExpoSqliteDriver implements SqlDriver {
   readonly name = 'expo-sqlite';
