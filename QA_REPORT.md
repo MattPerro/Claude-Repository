@@ -2,7 +2,7 @@
 
 Che cosa è stato verificato, **come**, e che cosa non lo è.
 
-Data dell'ultima esecuzione: **2026-09-19**.
+Data dell'ultima esecuzione: **2026-09-20**.
 Commit: vedi `git log --oneline -1`.
 
 ---
@@ -30,9 +30,11 @@ repository sostiene il contrario.
 
 | | |
 |---|---|
-| Test eseguiti | **429** |
-| Test passati | **429** |
-| File di test | 21 |
+| Test eseguiti | **501** |
+| Test passati | **501** |
+| File di test | 24 |
+| Typecheck dell'app | **passa** (0 errori) |
+| Bundle Metro | **si costruisce** |
 | Typecheck dei pacchetti | **passa** (`tsc -b`, exit 0) |
 | Difetti **bloccanti** aperti | vedi §7 |
 | Difetti **importanti** aperti | vedi §7 |
@@ -46,8 +48,11 @@ $ npm run typecheck
 (exit 0, nessun output)
 
 $ npm test
- Test Files  21 passed (21)
-      Tests  429 passed (429)
+ Test Files  24 passed (24)
+      Tests  501 passed (501)
+
+$ npx tsc --noEmit -p apps/mobile/tsconfig.json
+(exit 0, nessun errore)
 ```
 
 ---
@@ -59,22 +64,25 @@ $ npm test
 | `packages/core/test/twelveWeeks.test.ts` | **61** | fedeltà della scheda dell'utente a `SPEC.md` §3 |
 | `packages/core/test/theme.test.ts` | **53** | contrasto WCAG, aree di tocco, stati non solo a colore |
 | `packages/core/test/engine.test.ts` | **52** | motore adattivo, comportamenti vietati |
-| `packages/core/test/threeYear.test.ts` | **36** | copertura triennale, divieti §4.4, durate |
 | `packages/core/test/timer.test.ts` | **36** | timer, sospensione, cambio d'orologio, intervalli, lati |
+| `packages/core/test/threeYear.test.ts` | **36** | copertura triennale, divieti §4.4, durate |
+| `packages/core/test/specCompliance.test.ts` | **34** | conformità ai requisiti di contenuto della specifica |
+| `packages/core/test/engineRegressions.test.ts` | **33** | **regressioni della revisione indipendente** |
 | `packages/core/test/units.test.ts` | **30** | convenzioni di carico, virgola italiana, gradini |
 | `packages/core/test/exercises.test.ts` | **29** | completezza delle guide offline |
 | `packages/core/test/time.test.ts` | **27** | date, ora legale, anni bisestili, fusi orari |
 | `packages/db/test/sedute.test.ts` | **17** | sessioni, bozze, ripresa, snapshot congelato |
 | `packages/db/test/serie.test.ts` | **15** | serie, doppio tocco, comparabilità, valori nulli |
-| `packages/db/test/backup.test.ts` | **10** | esportazione, importazione, file corrotti |
 | `packages/db/test/sincronizzazione.test.ts` | **10** | coda, idempotenza, cursore |
+| `packages/db/test/backup.test.ts` | **10** | esportazione, importazione, file corrotti |
 | `packages/db/test/misurazioni.test.ts` | **9** | media mobile, peso dichiarato escluso |
 | `packages/db/test/migrazioni.test.ts` | **8** | migrazioni, `SchemaTooNewError` |
-| `packages/db/test/unitaDiLavoro.test.ts` | **7** | dati + oplog nella stessa transazione |
 | `packages/sync/test/protocol.recupero.test.ts` | **7** | primo recupero, nuova installazione |
-| `packages/sync/test/protocol.base.test.ts` | **5** | push, pull, idempotenza |
-| `packages/sync/test/protocol.errori.test.ts` | **5** | token revocato, quota, spazio, cambio account |
+| `packages/db/test/unitaDiLavoro.test.ts` | **7** | dati + oplog nella stessa transazione |
 | `packages/sync/test/unita.test.ts` | **5** | operazioni, pacchetti, digest |
+| `packages/sync/test/protocol.errori.test.ts` | **5** | token revocato, quota, spazio, cambio account |
+| `packages/sync/test/protocol.base.test.ts` | **5** | push, pull, idempotenza |
+| `packages/db/test/motoreEndToEnd.test.ts` | **5** | **motore attraverso la persistenza reale** |
 | `packages/sync/test/protocol.conflitti.test.ts` | **4** | conflitti, revisioni concorrenti |
 | `packages/db/test/prestazioni.test.ts` | **3** | archivio sintetico di tre anni |
 
@@ -329,9 +337,43 @@ assenze dichiarate.
 
 Nessun difetto bloccante **aperto** sui componenti verificati.
 
-Tre difetti bloccanti sono stati **trovati e corretti** durante lo sviluppo. Sono
-elencati qui perché la loro storia è informativa: tutti e tre sono del tipo che
-una lettura del codice non coglie.
+**Dieci difetti bloccanti sono stati trovati e corretti**, e vale la pena
+leggere come sono emersi, perché nessuno dei tre meccanismi che li hanno
+trovati era «scrivere più test della stessa specie».
+
+#### Trovati da una revisione indipendente del motore (4)
+
+`coach-safety`, che **non** ha scritto il motore, ha ricevuto il mandato di
+romperlo. Il motore era già coperto da 52 test scritti proprio per cogliere i
+comportamenti vietati, e questi difetti ci sono passati attraverso comunque.
+
+| Difetto | Come si manifestava |
+|---|---|
+| **«Prova una ripetizione in più» non passava dai controlli di sicurezza** | il motore proponeva un aumento nella seduta **successiva a un dolore che aveva interrotto l'esercizio**, con tecnica ceduta e margine zero, senza avvertenze. Il ramo veniva valutato *prima* delle condizioni |
+| **Prescrizione di un altro esercizio dopo una sostituzione** | un ripiego per posizione faceva giudicare un leg curl (prescritto 10-12) contro il 6-8 della pressa: 8 ripetizioni contavano come limite superiore |
+| **Carico assente su una serie letto come carico uniforme** | i `null` filtrati prima del controllo di uniformità: la proposta **citava come registrato** un valore che non esisteva |
+| **Il cambio di schema confermava l'incremento** | la settimana di scarico (meno serie, margine 4) contava come seconda esposizione «confrontabile» |
+
+Correzioni verificate da 33 test in
+`packages/core/test/engineRegressions.test.ts`, ciascuno fallente prima.
+
+#### Trovato scrivendo l'interfaccia (1)
+
+| Difetto | Come si manifestava |
+|---|---|
+| **Il motore adattivo era inerte** | `performed_exercises.technique` non era scrivibile da nessun repository e restava sempre `null`. Poiché il motore richiede `technique === 'controlled'`, **non avrebbe potuto proporre un incremento mai**. I 52 test del motore passavano perché costruiscono le esposizioni a mano; i 79 della persistenza passavano perché nessuno chiedeva di scrivere la tecnica |
+
+Correzione verificata da `packages/db/test/motoreEndToEnd.test.ts`, che
+percorre la catena completa dalla registrazione di una serie fino alla
+proposta del coach.
+
+#### Trovati costruendo il bundle (2, più 1 solo-web)
+
+Vedi §3.1. Due avrebbero fatto fallire anche la build iOS.
+
+#### Trovati dai test durante lo sviluppo (3)
+
+Sono del tipo che una lettura del codice non coglie.
 
 | Difetto | Come si manifestava | Correzione | Verificato da |
 |---|---|---|---|
@@ -347,6 +389,8 @@ richiede un Mac.
 
 | # | Difetto | Dove | Nota |
 |---|---|---|---|
+| I-0 | **Sei aree di dati non hanno un repository**: cardio svolto, check-in di recupero, camminate e note alimentari, giornate in pista, foto di progresso, eventi di calendario. Le tabelle e i convertitori esistono, l'accesso no: minuti di cardio, modulo moto e recupero non sono registrabili | `packages/db` | §11, §13.3, §13.4 non coperti |
+| I-0b | **I criteri di ingresso dei blocchi non sono valutati da nessun codice.** Sono dati completi nel piano, ma l'avanzamento di blocco resta una decisione dell'utente | `packages/core` | documentato in `TRAINING_MODEL.md` §5 |
 | I-1 | **Ambiguità sugli schemi di redirect OAuth per iOS.** La documentazione di Google è contraddittoria su quali schemi siano ancora supportati. Va risolto **prima** di scrivere il flusso: un redirect sbagliato non torna mai nell'app | `GOOGLE_DRIVE_SETUP.md` | bloccante per la sincronizzazione |
 | I-2 | **Nessun tetto ai tentativi per un pacchetto in quarantena permanente.** Un pacchetto corrotto in modo irreversibile viene ritentato a ogni pull, indefinitamente | `packages/sync` | spreco, non perdita di dati |
 | I-3 | **Le notifiche locali non sono state programmate né provate.** La logica di riprogrammazione è testata, l'integrazione con iOS no | `apps/mobile` | richiede un dispositivo |
@@ -387,7 +431,8 @@ Nella forma richiesta da `SPEC.md` §15.
 | OAuth Google | — | — | — | — | 🚧 |
 | Token di colore e contrasto | ✅ | ✅ | — | | |
 | Componenti di base | ✅ | — | — | ⬜ | |
-| Schermate dell'app | ✅ | — | — | ⬜ | |
+| Schermate dell'app (13 rotte) | ✅ | typecheck | — | ⬜ runtime | |
+| Costruzione del bundle Metro | ✅ | ✅ | — | | |
 | Backup ed esportazione JSON | ✅ | ✅ | — | | |
 | Esportazione CSV | — | — | — | — | 🚧 |
 | Cifratura lato client | — | — | — | — | 🚧 |
