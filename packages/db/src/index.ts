@@ -12,8 +12,21 @@
  */
 
 export * from './driver.js';
-export * from './drivers/nodeSqlite.js';
 export * from './drivers/expoSqlite.js';
+
+// `./drivers/nodeSqlite.js` NON e' riesportato da qui, deliberatamente.
+//
+// Importa `node:sqlite`, che Metro non sa risolvere: qualunque import di
+// `@trackstrong/db` dall'app Expo trascinava quel modulo e il bundle non si
+// costruiva. E' un difetto che nessun test poteva cogliere, perche' su Node
+// `node:sqlite` esiste.
+//
+// Il driver Node vive quindi in un punto d'ingresso separato, come fa
+// `@trackstrong/sync` con `src/testing/`:
+//
+//     import { openNodeSqlite } from '@trackstrong/db/node';
+//
+// L'app importa solo `@trackstrong/db`, che resta privo di moduli Node.
 
 export * from './json.js';
 export * from './migrate.js';

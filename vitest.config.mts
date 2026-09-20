@@ -20,6 +20,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@trackstrong/core': new URL('./packages/core/src/index.ts', import.meta.url).pathname,
+      '@trackstrong/db/node': new URL('./packages/db/src/node.ts', import.meta.url).pathname,
       '@trackstrong/db': new URL('./packages/db/src/index.ts', import.meta.url).pathname,
       '@trackstrong/sync': new URL('./packages/sync/src/index.ts', import.meta.url).pathname,
     },

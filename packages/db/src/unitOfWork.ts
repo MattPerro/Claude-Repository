@@ -313,11 +313,34 @@ export function rowPayload(row: SqlRow): JsonValue {
   return out;
 }
 
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/**
+ * Codifica in base64 senza dipendere da nulla.
+ *
+ * `btoa` esiste su Hermes e su Node 22 e viene usato quando c'e'. Il ripiego
+ * precedente era `Buffer`, che su React Native NON esiste: in caso di assenza
+ * di `btoa` quel ramo sarebbe stato un `ReferenceError` a runtime, cioe' un
+ * guasto proprio nel percorso di scrittura dei dati. Il ripiego ora e'
+ * un'implementazione esplicita, che non dipende dall'ambiente.
+ */
 function toBase64(bytes: Uint8Array): string {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  // `btoa` esiste su Hermes e su Node 22.
-  return typeof btoa === 'function' ? btoa(binary) : Buffer.from(bytes).toString('base64');
+  if (typeof btoa === 'function') return btoa(binary);
+
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i] ?? 0;
+    const b1 = bytes[i + 1] ?? 0;
+    const b2 = bytes[i + 2] ?? 0;
+    const triplet = (b0 << 16) | (b1 << 8) | b2;
+    out += BASE64_ALPHABET[(triplet >> 18) & 0x3f] ?? '';
+    out += BASE64_ALPHABET[(triplet >> 12) & 0x3f] ?? '';
+    out += i + 1 < bytes.length ? (BASE64_ALPHABET[(triplet >> 6) & 0x3f] ?? '') : '=';
+    out += i + 2 < bytes.length ? (BASE64_ALPHABET[triplet & 0x3f] ?? '') : '=';
+  }
+  return out;
 }
 
 /** Riesporta per comodita' dei repository. */

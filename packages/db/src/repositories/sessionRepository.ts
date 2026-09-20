@@ -24,11 +24,13 @@ import {
   type SessionCheckIn,
   type SessionSlot,
   type SessionStatus,
+  type DiscomfortReport,
+  type TechniqueRating,
 } from '@trackstrong/core';
 
-import { isUniqueViolation } from '../driver.js';
+import { isUniqueViolation, type SqlValue } from '../driver.js';
 import type { Database } from '../database.js';
-import { toJson } from '../json.js';
+import { toJson, toJsonOrNull } from '../json.js';
 import {
   toPerformedExercise,
   toPerformedSet,
@@ -112,6 +114,24 @@ export interface SessionRepository {
   resume(sessionId: string, at: Instant): Session;
   pause(sessionId: string, at: Instant): Session;
   addExercise(input: AddPerformedExerciseInput): string;
+  /**
+   * Dichiara la tecnica su un esercizio svolto.
+   *
+   * Senza questo metodo il campo restava sempre `null`, e poiche' il motore
+   * adattivo richiede `technique === 'controlled'` per proporre un incremento,
+   * **non avrebbe potuto proporne mai uno**: l'intero motore era inerte.
+   * Nessun test lo aveva colto, perche' i test del motore costruiscono le
+   * esposizioni direttamente invece di passare dalla persistenza.
+   */
+  setTechnique(performedExerciseId: string, technique: TechniqueRating | null): void;
+  /** Registra o rimuove un fastidio su un esercizio svolto. */
+  reportDiscomfort(performedExerciseId: string, discomfort: DiscomfortReport | null): void;
+  /** Segna un esercizio come saltato, o annulla il salto. */
+  skipExercise(performedExerciseId: string, skipped: boolean): void;
+  /** Aggiorna le regolazioni personali annotate (sedile, schienale, presa). */
+  setSettingsNote(performedExerciseId: string, note: string | null): void;
+  /** Salva la nota della seduta (§10). */
+  setNote(sessionId: string, note: string | null): void;
   saveDraft(input: {
     readonly sessionId: string;
     readonly performedExerciseId: string | null;
@@ -208,6 +228,37 @@ export function createSessionRepository(db: Database): SessionRepository {
     return toSession(require_(sessionId));
   };
 
+
+  /**
+   * Aggiorna alcuni campi di un esercizio svolto, incrementando la revisione
+   * e accodando l'operazione di sincronizzazione nella stessa transazione.
+   */
+  const patchPerformedExercise = (
+    ctx: WriteContext,
+    performedExerciseId: string,
+    patch: Record<string, SqlValue>,
+    cause: string,
+  ): void => {
+    const current = db.driver.get<{ revision: number; session_id: string }>(
+      'SELECT revision, session_id FROM performed_exercises WHERE id = ?',
+      [performedExerciseId],
+    );
+    if (current === undefined) {
+      throw new Error(`Esercizio svolto inesistente: ${performedExerciseId}.`);
+    }
+    const revision = current.revision + 1;
+    ctx.patch(
+      'performed_exercises',
+      performedExerciseId,
+      { ...patch, revision, updated_at: ctx.now },
+      upsertOperation(
+        revision,
+        current.revision,
+        { id: performedExerciseId, ...patch },
+        cause,
+      ),
+    );
+  };
   return {
     start: (input) =>
       withWrite(db, (ctx) => {
@@ -337,6 +388,59 @@ export function createSessionRepository(db: Database): SessionRepository {
           upsertOperation(1, null, rowPayload(row), 'esercizio in seduta'),
         );
         return row.id;
+      }),
+
+    setTechnique: (performedExerciseId, technique) =>
+      withWrite(db, (ctx) => {
+        patchPerformedExercise(ctx, performedExerciseId, { technique }, 'tecnica dichiarata');
+      }),
+
+    reportDiscomfort: (performedExerciseId, discomfort) =>
+      withWrite(db, (ctx) => {
+        patchPerformedExercise(
+          ctx,
+          performedExerciseId,
+          { discomfort_json: toJsonOrNull(discomfort) },
+          'fastidio segnalato',
+        );
+      }),
+
+    skipExercise: (performedExerciseId, skipped) =>
+      withWrite(db, (ctx) => {
+        patchPerformedExercise(
+          ctx,
+          performedExerciseId,
+          { skipped: skipped ? 1 : 0 },
+          skipped ? 'esercizio saltato' : 'salto annullato',
+        );
+      }),
+
+    setSettingsNote: (performedExerciseId, note) =>
+      withWrite(db, (ctx) => {
+        patchPerformedExercise(
+          ctx,
+          performedExerciseId,
+          { settings_note: note },
+          'regolazioni annotate',
+        );
+      }),
+
+    setNote: (sessionId, note) =>
+      withWrite(db, (ctx) => {
+        const current = db.driver.get<{ revision: number }>(
+          'SELECT revision FROM sessions WHERE id = ?',
+          [sessionId],
+        );
+        if (current === undefined) {
+          throw new Error(`Seduta inesistente: ${sessionId}.`);
+        }
+        const revision = current.revision + 1;
+        ctx.patch(
+          'sessions',
+          sessionId,
+          { note, revision, updated_at: ctx.now },
+          upsertOperation(revision, current.revision, { id: sessionId, note }, 'nota della seduta'),
+        );
       }),
 
     saveDraft: (input) =>

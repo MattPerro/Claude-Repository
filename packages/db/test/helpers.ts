@@ -29,12 +29,14 @@ import {
   createRepositories,
   migrate,
   openDatabase,
-  openNodeSqlite,
   SUPPORTED_PROTOCOL_VERSION,
   type Database,
   type Repositories,
   type SqlDriver,
 } from '@trackstrong/db';
+// Il driver Node ha un punto d'ingresso separato: `index.ts` non deve
+// trascinare `node:sqlite`, altrimenti il bundle dell'app non si costruisce.
+import { openNodeSqlite } from '@trackstrong/db/node';
 
 /** 1 marzo 2027, 09:00 UTC: istante fisso, per test riproducibili. */
 export const T0: Instant = Date.UTC(2027, 2, 1, 9, 0, 0);
