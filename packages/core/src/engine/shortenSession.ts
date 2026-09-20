@@ -80,6 +80,15 @@ export function shortenSession(
   availableMinutes: number,
   model: DurationModel = DEFAULT_DURATION_MODEL,
 ): ShortenResult {
+  // Un tempo non numerico finiva nel testo mostrato all'utente ("sopra i NaN
+  // disponibili", "riorganizzata per Infinity minuti"). Un ingresso non valido
+  // e' un errore del chiamante, non un messaggio da mostrare.
+  if (!Number.isFinite(availableMinutes) || availableMinutes <= 0) {
+    throw new Error(
+      `Minuti disponibili non validi: ${String(availableMinutes)}. Atteso un numero finito maggiore di zero.`,
+    );
+  }
+
   const originalMinutes = minutesOf(original, library, model);
   const steps: ReductionStep[] = [];
   let current = original;

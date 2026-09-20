@@ -256,13 +256,29 @@ export function createSetRepository(db: Database): SetRepository {
         if (current === undefined) {
           throw new InvalidSetError(`Serie inesistente: ${setId}.`);
         }
-        if (
-          changes.loadKg !== undefined &&
-          changes.loadKg !== null &&
-          requiresNoLoad(current.load_convention as LoadConvention)
-        ) {
+        const convention = current.load_convention as LoadConvention;
+
+        if (changes.loadKg !== undefined && changes.loadKg !== null && requiresNoLoad(convention)) {
           throw new InvalidSetError(
             `La convenzione "${current.load_convention}" non ammette un carico.`,
+          );
+        }
+
+        // Una correzione deve rispettare gli stessi vincoli di un
+        // inserimento. Prima non lo faceva, e svuotare il campo carico di una
+        // serie GIA' CONFERMATA la lasciava con `load_kg` nullo: il motore
+        // adattivo trattava quel buco come "carico uniforme" e proponeva un
+        // incremento citando un valore mai registrato.
+        if (
+          changes.loadKg !== undefined &&
+          changes.loadKg === null &&
+          !requiresNoLoad(convention) &&
+          current.status === 'completed'
+        ) {
+          throw new InvalidSetError(
+            `La convenzione "${current.load_convention}" richiede un carico per una serie confermata: ` +
+              'non e\' possibile svuotare il campo. Se il carico era sbagliato, correggilo con il valore giusto; ' +
+              'se la serie non va conteggiata, annullala.',
           );
         }
         const patch: Record<string, number | string | null> = {

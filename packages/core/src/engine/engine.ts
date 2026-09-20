@@ -28,12 +28,13 @@ import type { SessionSlot } from '../domain/prescription.js';
 import { formatRange } from '../domain/prescription.js';
 import type { Instant, LocalDate } from '../time.js';
 import { addDays, compareDates, diffDays, formatDateShortIt } from '../time.js';
-import { formatKgIt } from '../units.js';
+import { formatKgIt, nextLoadDown } from '../units.js';
 import type { EngineConfig } from './config.js';
 import { DEFAULT_ENGINE_CONFIG } from './config.js';
 import type { Exposure, SessionHistoryEntry } from './exposure.js';
 import { extractExposures, groupByComparability, performedValue } from './exposure.js';
-import { decideProgression, type ProgressionOutcome } from './progression.js';
+import { decideProgression, resolveLoadStep, type ProgressionOutcome } from './progression.js';
+import { shortenSession } from './shortenSession.js';
 
 /** Tutto cio' che il motore puo' guardare. Niente arriva da altre fonti. */
 export interface EngineContext {
@@ -290,34 +291,72 @@ export function evaluate(ctx: EngineContext): EngineResult {
       overrunCriterion.rule.kind === 'sessionOverrun' &&
       overrun >= overrunCriterion.rule.occurrences
     ) {
-      proposals.push(
-        buildProposal(ctx, config, {
-          title: 'Le sedute stanno durando troppo',
-          reason:
-            `${String(overrun)} sedute hanno superato di oltre 10 minuti il tempo che hai dichiarato disponibile. ` +
-            'La proposta e\' ridurre il lavoro (serie o esercizi a priorita\' piu\' bassa). ' +
-            'I recuperi restano quelli prescritti: accorciarli cambierebbe lo stimolo.',
-          change: {
-            kind: 'shortenSession',
-            availableMinutes: ctx.profile.availableMinutesPerSession,
-            keepExerciseIds: week.sessions[0]?.exercises.filter((e) => e.timePriority <= 2).map((e) => e.exerciseId) ?? [],
-            dropExerciseIds: week.sessions[0]?.exercises.filter((e) => e.timePriority > 2).map((e) => e.exerciseId) ?? [],
-            reducedSets: [],
-          },
-          evidence: [
-            {
-              label: 'Sedute oltre il tempo disponibile',
-              value: `${String(overrun)} negli ultimi dati`,
-              sourceSetIds: [],
-              sourceSessionIds: [],
+      // La proposta riguarda la PROSSIMA seduta, che non e' necessariamente la
+      // A. Prima si usava sempre `week.sessions[0]`, quindi con la seduta B in
+      // arrivo la proposta elencava gli esercizi della A: se applicata,
+      // avrebbe rimosso esercizi che nella B non esistono.
+      const target =
+        (slot === null ? undefined : week.sessions.find((sx) => sx.slot === slot)) ??
+        week.sessions[0];
+
+      if (target !== undefined) {
+        // Il taglio si calcola con `shortenSession()`, che e' la funzione
+        // verificata: cosi' `reducedSets` e i minuti risparmiati sono reali
+        // invece che vuoti, e i recuperi restano garantiti intatti.
+        const shortened = shortenSession(
+          target,
+          ctx.library,
+          ctx.profile.availableMinutesPerSession,
+        );
+
+        proposals.push(
+          buildProposal(ctx, config, {
+            title: `Le sedute stanno durando troppo (${target.title})`,
+            reason:
+              `${String(overrun)} sedute hanno superato di oltre 10 minuti il tempo che hai dichiarato disponibile. ` +
+              `${shortened.explanation} ` +
+              'I recuperi restano quelli prescritti: accorciarli cambierebbe lo stimolo.',
+            change: {
+              kind: 'shortenSession',
+              availableMinutes: ctx.profile.availableMinutesPerSession,
+              keepExerciseIds: shortened.keptExerciseIds,
+              dropExerciseIds: shortened.droppedExerciseIds,
+              reducedSets: shortened.session.exercises
+                .map((ex) => {
+                  const before = target.exercises.find((o) => o.exerciseId === ex.exerciseId);
+                  return before === undefined || before.workingSets === ex.workingSets
+                    ? null
+                    : {
+                        exerciseId: ex.exerciseId,
+                        fromSets: before.workingSets,
+                        toSets: ex.workingSets,
+                      };
+                })
+                .filter(
+                  (r): r is { exerciseId: string; fromSets: number; toSets: number } => r !== null,
+                ),
             },
-          ],
-          missing: [],
-          weekIndex: ctx.cursor.weekIndex,
-          slot,
-          requiresExplicitConfirmation: true,
-        }),
-      );
+            evidence: [
+              {
+                label: 'Sedute oltre il tempo disponibile',
+                value: `${String(overrun)} negli ultimi dati`,
+                sourceSetIds: [],
+                sourceSessionIds: [],
+              },
+              {
+                label: 'Durata stimata',
+                value: `${String(shortened.originalMinutes)} min -> ${String(shortened.finalMinutes)} min`,
+                sourceSetIds: [],
+                sourceSessionIds: [],
+              },
+            ],
+            missing: [],
+            weekIndex: ctx.cursor.weekIndex,
+            slot,
+            requiresExplicitConfirmation: true,
+          }),
+        );
+      }
     }
   }
 
@@ -391,37 +430,82 @@ function outcomeToProposal(
                 toReps: outcome.toValue,
               },
         evidence,
-        missing: [],
+        // Le informazioni mancanti della proposta di ripetizioni (tipicamente
+        // il margine non dichiarato) vengono mostrate, non nascoste.
+        missing: outcome.missing,
         weekIndex: ctx.cursor.weekIndex,
         slot,
         requiresExplicitConfirmation: false,
       });
 
-    case 'discomfort':
-      return buildProposal(ctx, config, {
-        title: `${name}: fastidio ripetuto`,
-        reason: outcome.reason,
-        change:
-          latest.prescription.alternativeExerciseIds[0] !== undefined
-            ? {
-                kind: 'substituteExercise',
-                exerciseId: latest.exerciseId,
-                replacementExerciseId: latest.prescription.alternativeExerciseIds[0],
-                scope: 'today',
-              }
-            : {
+    case 'discomfort': {
+      // Tre strade, in ordine di preferenza. Nessuna di esse inventa un
+      // numero: prima `fromKg`/`toKg` erano entrambi `latest.loadKg ?? 0`,
+      // quindi la proposta "riduci temporaneamente il carico" proponeva lo
+      // STESSO carico, e su un esercizio a tempo proponeva 0 kg - cioe' un
+      // carico per un esercizio che non ne ha.
+      const alternative = latest.prescription.alternativeExerciseIds[0];
+      const change = ((): ProposalChange => {
+        if (alternative !== undefined) {
+          return {
+            kind: 'substituteExercise',
+            exerciseId: latest.exerciseId,
+            replacementExerciseId: alternative,
+            scope: 'today',
+          };
+        }
+
+        // Riduzione del carico: solo se un carico esiste E se esiste un
+        // gradino piu' basso realmente impostabile.
+        const currentLoad = latest.loadKg;
+        if (currentLoad !== null && !latest.loadNotApplicable) {
+          const exercise = ctx.library.find(latest.exerciseId);
+          const equipment =
+            latest.equipmentInstanceId === null
+              ? undefined
+              : ctx.equipment.get(latest.equipmentInstanceId);
+          if (exercise !== undefined) {
+            const { step } = resolveLoadStep(exercise, equipment);
+            const reduced = nextLoadDown(currentLoad, step);
+            if (reduced !== null && reduced < currentLoad) {
+              return {
                 kind: 'reduceLoadTemporarily',
                 exerciseId: latest.exerciseId,
-                fromKg: latest.loadKg ?? 0,
-                toKg: latest.loadKg ?? 0,
+                fromKg: currentLoad,
+                toKg: reduced,
                 forSessions: 2,
-              },
+              };
+            }
+          }
+        }
+
+        // Nessun carico da ridurre (esercizio a tempo, corpo libero, carico
+        // gia' al minimo): si riduce il VOLUME, che e' una leva reale.
+        const currentSets = latest.prescription.workingSets;
+        return {
+          kind: 'changeVolume',
+          exerciseId: latest.exerciseId,
+          fromSets: currentSets,
+          toSets: Math.max(1, currentSets - 1),
+        };
+      })();
+
+      const extra =
+        change.kind === 'changeVolume'
+          ? " Per questo esercizio non c'e' un carico da ridurre, quindi la proposta e' una serie in meno."
+          : '';
+
+      return buildProposal(ctx, config, {
+        title: `${name}: fastidio ripetuto`,
+        reason: outcome.reason + extra,
+        change,
         evidence,
         missing: [],
         weekIndex: ctx.cursor.weekIndex,
         slot,
         requiresExplicitConfirmation: true,
       });
+    }
 
     case 'stalled':
       return buildProposal(ctx, config, {
@@ -436,10 +520,11 @@ function outcomeToProposal(
       });
 
     case 'hold':
-      // Il mantenimento diventa una proposta visibile SOLO quando c'e'
-      // qualcosa da dire: un'informazione mancante da colmare. Altrimenti
-      // riempirebbe l'elenco di voci inutili.
-      if (outcome.missing.length === 0) return null;
+      // Il mantenimento diventa visibile quando ha qualcosa da dire, non solo
+      // quando manca un dato: vedi il commento di `surface` in
+      // `progression.ts`. La spiegazione di un blocco per fastidio non ha
+      // informazioni mancanti da colmare, ed e' la piu' importante di tutte.
+      if (!outcome.surface) return null;
       return buildProposal(ctx, config, {
         title: `${name}: mantieni i valori attuali`,
         reason: outcome.reason,
@@ -460,7 +545,14 @@ function outcomeToProposal(
 function countSessionOverruns(ctx: EngineContext): number {
   const limit = ctx.profile.availableMinutesPerSession + 10;
   let count = 0;
-  for (const entry of ctx.history.slice(0, 6)) {
+  // Lo storico viene ORDINATO invece di assumerlo ordinato: `extractExposures`
+  // lo fa, e questa funzione non lo faceva, quindi con un array invertito
+  // contava le sedute piu' vecchie.
+  const recent = [...ctx.history]
+    .filter((h) => h.session.performedDate !== null)
+    .sort((a, b) => compareDates(b.session.performedDate ?? '', a.session.performedDate ?? ''))
+    .slice(0, 6);
+  for (const entry of recent) {
     const { startedAt, endedAt, pausedMs } = entry.session;
     if (startedAt === null || endedAt === null) continue;
     const minutes = Math.round((endedAt - startedAt - pausedMs) / 60_000);

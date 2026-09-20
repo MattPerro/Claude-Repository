@@ -190,18 +190,6 @@ export function buildPrefill(
   };
 }
 
-/** Caselle gia' confermate, indicizzate per `order|side`. */
-export function indexConfirmed(
-  sets: readonly StoredPerformedSet[],
-): ReadonlyMap<string, StoredPerformedSet> {
-  const map = new Map<string, StoredPerformedSet>();
-  for (const set of sets) {
-    if (set.status !== 'completed' && set.status !== 'skipped') continue;
-    map.set(`${set.performedExerciseId}|${String(set.order)}|${set.side}`, set);
-  }
-  return map;
-}
-
 /** Serie allenanti previste dalla fotografia: le serie, NON i lati. */
 export function prescribedWorkingSets(prescription: SessionPrescription): number {
   return prescription.exercises.reduce((total, ex) => total + ex.workingSets, 0);

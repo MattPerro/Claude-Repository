@@ -19,7 +19,12 @@ import type { LoadStep } from '../units.js';
 import { isInvertedProgress, nextLoadDown, nextLoadUp } from '../units.js';
 import type { EngineConfig } from './config.js';
 import type { Exposure } from './exposure.js';
-import { allSetsAtRangeTop, bestPerformedValue, performedValue } from './exposure.js';
+import {
+  allSetsAtRangeTop,
+  highestPerformedValue,
+  lowestPerformedValue,
+  performedValue,
+} from './exposure.js';
 
 /** Esito di una singola condizione, con la sua motivazione. */
 export interface ConditionResult {
@@ -53,7 +58,7 @@ export function checkRangeTop(exposure: Exposure): ConditionResult {
         `(${String(exposure.target.max)} ${exposure.metric === 'seconds' ? 'secondi' : 'ripetizioni'}).`,
     );
   }
-  const best = bestPerformedValue(exposure);
+  const best = lowestPerformedValue(exposure);
   if (best === null) {
     return no(
       'Nessun valore eseguito registrato nelle serie di questa seduta.',
@@ -96,6 +101,15 @@ export function checkEffortMargin(
   }
 
   const declared = exposure.completedSets.map((s) => s.rir);
+  // Zero serie: `Math.min(...[])` vale `Infinity` e la condizione risultava
+  // soddisfatta con il messaggio "margine compreso fra Infinity e -Infinity".
+  // Un'assenza di dati non e' un margine adeguato.
+  if (declared.length === 0) {
+    return no(
+      "Nessuna serie confermata: non c'e' nessun margine da valutare.",
+      missingInfo('noRirDeclared'),
+    );
+  }
   if (declared.some((r) => r === null)) {
     const declaredCount = declared.filter((r) => r !== null).length;
     return no(
@@ -140,6 +154,35 @@ export function checkTechnique(exposure: Exposure): ConditionResult {
 // Condizione 4: nessun problema segnalato
 // ---------------------------------------------------------------------------
 
+/**
+ * Il carico registrato e' un dato completo?
+ *
+ * Quinta condizione, aggiunta dopo la revisione. Serviva perche' un carico
+ * cancellato su una sola serie (possibile correggendo una serie gia'
+ * confermata) rendeva l'esposizione "a carico uniforme" e la proposta citava
+ * come registrato un valore che non esisteva.
+ */
+export function checkLoadRecorded(exposure: Exposure): ConditionResult {
+  if (exposure.loadNotApplicable) {
+    return ok("Esercizio senza carico esterno: non c'e' un carico da registrare.");
+  }
+  if (exposure.partialLoads) {
+    return no(
+      "Il carico manca su almeno una delle serie confermate: il dato non e' completo.",
+      missingInfo('noLoadRecorded'),
+    );
+  }
+  if (exposure.mixedLoads) {
+    return no(
+      'Le serie di questa seduta hanno usato carichi diversi fra loro: non esiste un riferimento unico da aumentare.',
+    );
+  }
+  if (exposure.loadKg === null) {
+    return no('Nessun carico registrato nelle serie confermate.', missingInfo('noLoadRecorded'));
+  }
+  return ok(`Carico uniforme registrato su tutte le serie.`);
+}
+
 export function checkNoIssues(exposure: Exposure): ConditionResult {
   const d = exposure.discomfort;
   if (d === null) return ok('Nessun fastidio segnalato su questo esercizio.');
@@ -159,8 +202,15 @@ export interface ExposureVerdict {
   readonly effortMargin: ConditionResult;
   readonly technique: ConditionResult;
   readonly noIssues: ConditionResult;
-  /** true solo se tutte e quattro le condizioni sono soddisfatte. */
+  readonly loadRecorded: ConditionResult;
+  /** true solo se TUTTE le condizioni sono soddisfatte. */
   readonly qualifiesForIncrease: boolean;
+  /**
+   * true se non ci sono segnali di SICUREZZA contrari: nessun fastidio e
+   * tecnica controllata. E' il presupposto minimo anche per una semplice
+   * proposta di "una ripetizione in piu'", che resta un incremento.
+   */
+  readonly safeToProgress: boolean;
   readonly missing: readonly MissingInformation[];
 }
 
@@ -170,7 +220,9 @@ export function evaluateExposure(exposure: Exposure, config: EngineConfig): Expo
   const technique = checkTechnique(exposure);
   const noIssues = checkNoIssues(exposure);
 
-  const all = [rangeTop, effortMargin, technique, noIssues];
+  const loadRecorded = checkLoadRecorded(exposure);
+
+  const all = [rangeTop, effortMargin, technique, noIssues, loadRecorded];
   const missing = all
     .map((c) => c.missing)
     .filter((m): m is MissingInformation => m !== null);
@@ -181,7 +233,11 @@ export function evaluateExposure(exposure: Exposure, config: EngineConfig): Expo
     effortMargin,
     technique,
     noIssues,
+    loadRecorded,
     qualifiesForIncrease: all.every((c) => c.satisfied),
+    // Fastidio e tecnica sono i due segnali che riguardano l'incolumita':
+    // valgono anche quando l'incremento proposto e' di una sola ripetizione.
+    safeToProgress: noIssues.satisfied && technique.satisfied,
     missing,
   };
 }
@@ -198,6 +254,8 @@ export type ProgressionOutcome =
       readonly toValue: number;
       readonly metric: 'reps' | 'seconds';
       readonly reason: string;
+      /** Informazioni mancanti che la proposta dichiara invece di nascondere. */
+      readonly missing: readonly MissingInformation[];
       readonly verdicts: readonly ExposureVerdict[];
     }
   | {
@@ -223,6 +281,17 @@ export type ProgressionOutcome =
       readonly kind: 'hold';
       readonly reason: string;
       readonly missing: readonly MissingInformation[];
+      /**
+       * true se questo mantenimento va MOSTRATO all'utente.
+       *
+       * Prima l'interfaccia mostrava un mantenimento solo quando c'era
+       * un'informazione mancante da colmare. Conseguenza: la spiegazione piu'
+       * importante di tutte - "non propongo nessun aumento perche' hai
+       * segnalato un fastidio" - restava invisibile, perche' quel caso non ha
+       * informazioni mancanti da colmare. Un mantenimento con una ragione di
+       * sicurezza o di schema si mostra sempre.
+       */
+      readonly surface: boolean;
       readonly verdicts: readonly ExposureVerdict[];
     }
   | {
@@ -271,6 +340,7 @@ export function decideProgression(
   if (comparable.length === 0) {
     return {
       kind: 'hold',
+      surface: true,
       reason: 'Non esiste ancora uno storico confrontabile per questo esercizio su questo attrezzo.',
       missing: [missingInfo('noComparableHistory')],
       verdicts: [],
@@ -299,37 +369,124 @@ export function decideProgression(
   // soddisfino tutte e quattro le condizioni. Una sola non basta.
   const confirming = verdicts.slice(0, config.confirmExposures);
   const enoughExposures = confirming.length >= config.confirmExposures;
-  const allQualify = enoughExposures && confirming.every((v) => v.qualifiesForIncrease);
+
+  // "Comparabili" non riguarda solo l'attrezzo: riguarda anche la
+  // PRESCRIZIONE. Due esposizioni con serie previste, intervallo o margine
+  // diversi non sono confrontabili come risultato.
+  //
+  // Il caso reale che questo impedisce: la settimana di scarico del piano
+  // prescrive meno serie e margine 4, e dichiara esplicitamente che i carichi
+  // restano quelli della settimana precedente. Senza questo controllo, una
+  // seduta di scarico contava come "seconda esposizione consecutiva
+  // confrontabile" e confermava un incremento che nessuno aveva guadagnato.
+  const signatures = new Set(confirming.map((v) => v.exposure.prescriptionSignature));
+  const samePrescription = signatures.size <= 1;
+
+  const allQualify =
+    enoughExposures && samePrescription && confirming.every((v) => v.qualifiesForIncrease);
+
+  if (enoughExposures && !samePrescription && confirming.every((v) => v.qualifiesForIncrease)) {
+    const weeks = confirming.map((v) => v.exposure.weekIndex);
+    return {
+      kind: 'hold',
+      surface: true,
+      reason:
+        'Le due sedute piu\' recenti hanno prescrizioni diverse (settimane ' +
+        `${weeks.map((w) => String(w)).join(' e ')}): serie previste, intervallo o margine non coincidono. ` +
+        'Un risultato ottenuto con uno schema diverso non conferma un progresso: ' +
+        'serve una seconda seduta con la stessa prescrizione.',
+      missing: [missingInfo('notEnoughExposures')],
+      verdicts,
+    };
+  }
 
   const latest = verdicts[0];
   if (latest === undefined) {
     return {
       kind: 'hold',
+      surface: true,
       reason: 'Nessuna esposizione utilizzabile.',
       missing: [missingInfo('noComparableHistory')],
       verdicts,
     };
   }
 
+  // ------------------------------------------- 2a. progressione di ripetizioni
+  //
   // Doppia progressione: se le ripetizioni non sono al limite superiore, il
-  // passo successivo e' salire di ripetizioni, NON di carico. Questo vale
-  // anche quando mancano altri dati: alzare di una ripetizione entro
-  // l'intervallo prescritto non aumenta il carico e resta dentro la
-  // prescrizione del programma.
+  // passo successivo e' salire di ripetizioni, non di carico.
+  //
+  // MA una ripetizione in piu' E' UN INCREMENTO, e la specifica (§5.1) dice
+  // "si propone un incremento solo se tutte queste condizioni sono vere".
+  // Prima questo ramo veniva valutato senza guardare fastidio, tecnica e
+  // margine: il motore poteva proporre "prova 7 ripetizioni" nella seduta
+  // successiva a un dolore che aveva interrotto l'esercizio, con tecnica
+  // dichiarata ceduta e margine zero, e senza nessuna avvertenza. Era il
+  // difetto piu' pericoloso trovato in revisione.
+  //
+  // Ora fastidio e tecnica sono vincolanti; il margine, se insufficiente o
+  // non dichiarato, non blocca (alzare di una ripetizione dentro
+  // l'intervallo prescritto non aggiunge carico) ma viene DICHIARATO fra le
+  // informazioni mancanti.
   if (!latest.rangeTop.satisfied) {
-    const current = bestPerformedValue(latest.exposure);
-    if (current !== null && current < latest.exposure.target.max) {
-      const next = Math.min(current + 1, latest.exposure.target.max);
+    if (!latest.safeToProgress) {
+      const blocking = [latest.noIssues, latest.technique].filter((c) => !c.satisfied);
+      return {
+        kind: 'hold',
+        surface: true,
+        reason:
+          'Non si propone nessun aumento, nemmeno di una ripetizione. ' +
+          blocking.map((c) => c.explanation).join(' '),
+        missing: dedupeMissing(blocking.map((c) => c.missing).filter((m) => m !== null)),
+        verdicts,
+      };
+    }
+
+    const current = lowestPerformedValue(latest.exposure);
+    const highest = highestPerformedValue(latest.exposure);
+    if (current !== null && highest !== null && current < latest.exposure.target.max) {
+      // La proposta resta DENTRO l'intervallo prescritto anche verso il basso.
+      // Prima il limite c'era solo verso l'alto, e una serie crollata da 12 a
+      // 5 su un esercizio prescritto 10-12 produceva "prova 6 ripetizioni".
+      const next = Math.min(
+        Math.max(current + 1, latest.exposure.target.min),
+        latest.exposure.target.max,
+      );
+
+      // Dispersione ampia fra le serie: non e' una base su cui costruire un
+      // "+1". Si segnala invece di proporre.
+      const spread = highest - current;
+      const range = latest.exposure.target.max - latest.exposure.target.min;
+      if (spread > Math.max(2, range)) {
+        return {
+          kind: 'hold',
+          surface: true,
+          reason:
+            `Le serie di questa seduta sono molto diverse fra loro (dalla piu' bassa a ${String(current)} ` +
+            `alla piu' alta a ${String(highest)}, su un intervallo prescritto di ` +
+            `${String(latest.exposure.target.min)}-${String(latest.exposure.target.max)}). ` +
+            'Prima di aumentare conviene capire perche\', invece di costruire un incremento su una serie crollata.',
+          missing: [],
+          verdicts,
+        };
+      }
+
+      const unit = latest.exposure.metric === 'seconds' ? 'secondi' : 'ripetizioni';
+      const marginMissing = latest.effortMargin.satisfied
+        ? []
+        : dedupeMissing([latest.effortMargin.missing].filter((m) => m !== null));
+
       return {
         kind: 'increaseWithinRange',
         fromValue: current,
         toValue: next,
         metric: latest.exposure.metric,
         reason:
-          `Doppia progressione: prima si sale di ${latest.exposure.metric === 'seconds' ? 'secondi' : 'ripetizioni'} ` +
-          `entro l'intervallo prescritto (${String(latest.exposure.target.min)}-${String(latest.exposure.target.max)}), ` +
-          'poi eventualmente di carico. ' +
-          latest.rangeTop.explanation,
+          `Doppia progressione: prima si sale di ${unit} entro l'intervallo prescritto ` +
+          `(${String(latest.exposure.target.min)}-${String(latest.exposure.target.max)}), poi eventualmente di carico. ` +
+          latest.rangeTop.explanation +
+          (latest.effortMargin.satisfied ? '' : ` ${latest.effortMargin.explanation}`),
+        missing: marginMissing,
         verdicts,
       };
     }
@@ -342,13 +499,18 @@ export function decideProgression(
       // il limite superiore e' raggiunto ma non c'e' un carico da aumentare.
       return {
         kind: 'hold',
-        reason:
-          'Il limite superiore dell\'intervallo e\' stato raggiunto in modo confermato, ma per questo esercizio ' +
-          'non c\'e\' un carico da aumentare: il passo successivo e\' previsto dal cambio di schema del blocco.' +
-          (latest.exposure.mixedLoads
-            ? ' Le serie di questa seduta hanno usato carichi diversi fra loro: non e\' un riferimento unico.'
-            : ''),
-        missing: latest.exposure.mixedLoads ? [] : [missingInfo('noLoadRecorded')],
+        surface: true,
+        reason: latest.exposure.mixedLoads
+          ? "Il limite superiore dell'intervallo e' stato raggiunto, ma le serie di questa seduta hanno " +
+            "usato carichi diversi fra loro: non esiste un riferimento unico da aumentare. " +
+            'Per far ripartire la progressione servono due sedute con lo stesso carico su tutte le serie allenanti.'
+          : "Il limite superiore dell'intervallo e' stato raggiunto in modo confermato, ma per questo " +
+            "esercizio non c'e' un carico da aumentare: il passo successivo e' previsto dal cambio di " +
+            'schema del blocco.',
+        // Per un esercizio senza carico `noLoadRecorded` sarebbe una richiesta
+        // impossibile da soddisfare: non si chiede di colmare
+        // un'informazione che non potra' mai esistere.
+        missing: latest.exposure.loadNotApplicable ? [] : [missingInfo('noLoadRecorded')],
         verdicts,
       };
     }
@@ -357,6 +519,7 @@ export function decideProgression(
     if (step.stepKg <= 0) {
       return {
         kind: 'hold',
+        surface: true,
         reason:
           'Le condizioni per un incremento sono soddisfatte, ma per questo attrezzo non e\' disponibile nessun ' +
           'incremento di carico. Senza quel dato il motore non inventa un numero.',
@@ -373,6 +536,7 @@ export function decideProgression(
     if (next === null) {
       return {
         kind: 'hold',
+        surface: true,
         reason: inverted
           ? 'Le condizioni sono soddisfatte, ma l\'assistenza e\' gia\' al minimo impostabile su questo attrezzo.'
           : 'Le condizioni sono soddisfatte, ma il carico e\' gia\' al massimo impostabile su questo attrezzo.',
@@ -423,7 +587,7 @@ export function decideProgression(
     );
   }
   for (const v of confirming) {
-    for (const c of [v.rangeTop, v.effortMargin, v.technique, v.noIssues]) {
+    for (const c of [v.rangeTop, v.effortMargin, v.technique, v.noIssues, v.loadRecorded]) {
       if (!c.satisfied && !reasons.includes(c.explanation)) reasons.push(c.explanation);
     }
   }
@@ -435,6 +599,9 @@ export function decideProgression(
 
   return {
     kind: 'hold',
+    // Mantenimento ordinario: si mostra solo se c'e' davvero qualcosa da
+    // colmare, altrimenti riempirebbe l'elenco di voci inutili.
+    surface: missing.length > 0,
     reason:
       'Si mantengono i valori attuali. ' +
       (reasons.length > 0 ? reasons.join(' ') : 'Nessuna condizione per un incremento e\' soddisfatta.'),
@@ -488,14 +655,36 @@ function countExposuresWithoutProgress(exposures: readonly Exposure[]): number {
     const olderLoad = older.loadKg;
     const newerValue = totalPerformed(newer);
     const olderValue = totalPerformed(older);
+    // Totali non calcolabili: confronto impossibile, non assenza di progresso.
+    if (newerValue === null || olderValue === null) break;
+
+    // Un dato NON CONFRONTABILE non e' un'assenza di progresso.
+    //
+    // Prima, se una delle due esposizioni aveva carichi diversi fra le serie
+    // (`loadKg: null`), il confronto fallisce e veniva contato come "nessun
+    // progresso". Il risultato: un carico salito di 20 kg in quattro sedute
+    // veniva letto come stallo, e il motore proponeva di ripetere la
+    // settimana. La specifica vieta di inferire un plateau senza prova, e qui
+    // la prova non esiste perche' il confronto non si puo' fare.
+    // Carichi misti o parziali fra le serie: `loadKg` e' `null` per
+    // costruzione, quindi "entrambi null" NON significa "entrambi senza
+    // carico". Il confronto e' impossibile, e un confronto impossibile non e'
+    // un'assenza di progresso.
+    if (newer.mixedLoads || older.mixedLoads || newer.partialLoads || older.partialLoads) break;
+
+    const comparableLoads =
+      (newerLoad === null && olderLoad === null) || (newerLoad !== null && olderLoad !== null);
+    if (!comparableLoads) break;
+
+    // Anche una prescrizione diversa rende il confronto privo di significato.
+    if (newer.prescriptionSignature !== older.prescriptionSignature) break;
 
     const improvedLoad = newerLoad !== null && olderLoad !== null && newerLoad > olderLoad;
-    const improvedValue =
-      newerLoad !== null && olderLoad !== null && newerLoad === olderLoad
-        ? newerValue > olderValue
-        : newerLoad === null && olderLoad === null
-          ? newerValue > olderValue
-          : false;
+    const regressedLoad = newerLoad !== null && olderLoad !== null && newerLoad < olderLoad;
+    // Un carico SCESO non e' un progresso, ma nemmeno uno stallo: e' un altro
+    // fenomeno, e contarlo come stallo confonderebbe due cose diverse.
+    if (regressedLoad) break;
+    const improvedValue = newerValue > olderValue;
 
     if (improvedLoad || improvedValue) break;
     count += 1;
@@ -503,7 +692,20 @@ function countExposuresWithoutProgress(exposures: readonly Exposure[]): number {
   return count;
 }
 
-/** Somma delle ripetizioni (o secondi) confermate nell'esposizione. */
-function totalPerformed(exposure: Exposure): number {
-  return exposure.completedSets.reduce((sum, set) => sum + (performedValue(set) ?? 0), 0);
+/**
+ * Somma delle ripetizioni (o secondi) confermate nell'esposizione.
+ *
+ * Restituisce `null` se una qualunque serie non ha un valore registrato:
+ * prima un valore assente contribuiva 0 al totale, il che rendeva
+ * l'esposizione artificialmente peggiore e poteva mascherare un progresso.
+ * Un totale calcolato su un dato incompleto non e' un totale.
+ */
+function totalPerformed(exposure: Exposure): number | null {
+  let sum = 0;
+  for (const set of exposure.completedSets) {
+    const value = performedValue(set);
+    if (value === null) return null;
+    sum += value;
+  }
+  return sum;
 }

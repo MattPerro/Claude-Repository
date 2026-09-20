@@ -18,9 +18,20 @@ import { useTheme } from '../../src/theme/ThemeProvider';
  * barra di navigazione: un simbolo testuale scala con i caratteri di iOS e
  * l'etichetta accanto resta sempre leggibile.
  */
-function TabGlyph({ glyph, color }: { readonly glyph: string; readonly color: string }): React.ReactElement {
+function TabGlyph({
+  glyph,
+  focused,
+}: {
+  readonly glyph: string;
+  readonly focused: boolean;
+}): React.ReactElement {
+  const t = useTheme();
   return (
-    <TsText role="body" color={color} weight="bold">
+    <TsText
+      role="body"
+      color={focused ? t.colors.accent : t.colors.textMuted}
+      weight="bold"
+    >
       {glyph}
     </TsText>
   );
@@ -47,7 +58,7 @@ export default function TabsLayout(): React.ReactElement {
         options={{
           title: 'Oggi',
           tabBarAccessibilityLabel: 'Oggi: la prossima seduta e il comando per iniziare',
-          tabBarIcon: ({ color }) => <TabGlyph glyph="▶" color={color} />,
+          tabBarIcon: ({ focused }) => <TabGlyph glyph="▶" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -55,7 +66,7 @@ export default function TabsLayout(): React.ReactElement {
         options={{
           title: 'Calendario',
           tabBarAccessibilityLabel: 'Calendario: sedute previste e svolte, per mese e per settimana',
-          tabBarIcon: ({ color }) => <TabGlyph glyph="▦" color={color} />,
+          tabBarIcon: ({ focused }) => <TabGlyph glyph="▦" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -63,7 +74,7 @@ export default function TabsLayout(): React.ReactElement {
         options={{
           title: 'Programma',
           tabBarAccessibilityLabel: 'Programma: prossime sedute, blocchi e lungo termine',
-          tabBarIcon: ({ color }) => <TabGlyph glyph="▤" color={color} />,
+          tabBarIcon: ({ focused }) => <TabGlyph glyph="▤" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -71,7 +82,7 @@ export default function TabsLayout(): React.ReactElement {
         options={{
           title: 'Progressi',
           tabBarAccessibilityLabel: 'Progressi: carichi, ripetizioni, durate, peso e misurazioni',
-          tabBarIcon: ({ color }) => <TabGlyph glyph="◪" color={color} />,
+          tabBarIcon: ({ focused }) => <TabGlyph glyph="◪" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -79,7 +90,7 @@ export default function TabsLayout(): React.ReactElement {
         options={{
           title: 'Coach',
           tabBarAccessibilityLabel: 'Coach: proposte del motore adattivo locale',
-          tabBarIcon: ({ color }) => <TabGlyph glyph="◎" color={color} />,
+          tabBarIcon: ({ focused }) => <TabGlyph glyph="◎" focused={focused} />,
         }}
       />
     </Tabs>

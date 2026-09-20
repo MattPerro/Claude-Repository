@@ -14,7 +14,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { SafeAreaView, ScrollView, View } from 'react-native';
+import { SafeAreaView, ScrollView } from 'react-native';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Button, Card, TsText } from '../src/components/base';
@@ -144,7 +144,7 @@ function SyncBlockedNotice(): React.ReactElement | null {
   const reason = status.core?.sync.blockedReason ?? null;
   if (reason === null) return null;
   return (
-    <View
+    <SafeAreaView
       accessible
       accessibilityLabel={`Sincronizzazione bloccata. ${reason} I dati locali sono intatti.`}
       style={{
@@ -164,7 +164,7 @@ function SyncBlockedNotice(): React.ReactElement | null {
         I dati locali sono intatti e l&apos;app si usa normalmente: allenamenti,
         registrazione, timer e storico funzionano.
       </TsText>
-    </View>
+    </SafeAreaView>
   );
 }
 

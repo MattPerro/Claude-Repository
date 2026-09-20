@@ -49,10 +49,11 @@ export interface ChartScale {
 /**
  * Scala sui dati realmente presenti.
  *
- * L'asse Y **non** parte forzatamente da zero: per un peso corporeo attorno ai
- * 100 kg partire da zero rende invisibile qualunque variazione reale. Il
- * dominio effettivo e' dichiarato accanto al grafico, cosi' la scelta e'
- * ispezionabile invece di essere nascosta.
+ * L'asse Y **non** parte forzatamente da zero: per una grandezza che varia di
+ * poco attorno a un valore alto (il peso corporeo e' il caso tipico) partire da
+ * zero rende invisibile qualunque variazione reale. Il dominio effettivo e'
+ * dichiarato accanto al grafico, cosi' la scelta e' ispezionabile invece di
+ * essere nascosta.
  */
 export function buildScale(
   series: readonly ChartSeries[],

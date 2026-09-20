@@ -12,7 +12,8 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { BODY_SIDE_LABEL, formatDecimalIt, type StoredPerformedSet } from '@trackstrong/core';
+import { BODY_SIDE_LABEL, formatDecimalIt } from '@trackstrong/core';
+import type { StoredPerformedSet } from '@trackstrong/db';
 import { Button, Card, Divider, StateBadge, TsText } from '../base';
 import { useTheme } from '../../theme/ThemeProvider';
 import { formatLoadIt } from '../../lib/format';

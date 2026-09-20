@@ -2,8 +2,11 @@
 
 Che cosa il coach può proporre, a quali condizioni, e cosa gli è vietato fare.
 
-Data di scrittura: **2026-09-19**.
-Codice: `packages/core/src/engine/`. Test: `packages/core/test/engine.test.ts` (52 test).
+Data di scrittura: **2026-09-19**. Revisionato e corretto: **2026-09-20**.
+Codice: `packages/core/src/engine/`.
+Test: `packages/core/test/engine.test.ts` (52) e
+`packages/core/test/engineRegressions.test.ts` (regressioni della revisione
+indipendente).
 
 ---
 
@@ -53,7 +56,7 @@ Non solo «aggiungi peso». Undici tipi di modifica (`ProposalChange`):
 
 | Tipo | Quando |
 |---|---|
-| `hold` | mantenere i valori attuali (mostrato solo se c'è un'informazione mancante da colmare) |
+| `hold` | mantenere i valori attuali, con il motivo. Mostrato quando ha qualcosa da dire: un blocco per sicurezza, un cambio di schema o un dato da colmare |
 | `increaseReps` | salire di ripetizioni entro l'intervallo — **primo passo** della doppia progressione |
 | `increaseDuration` | salire di secondi entro l'intervallo, per gli esercizi a tempo |
 | `increaseLoad` | salire di carico — solo dopo aver esaurito l'intervallo di ripetizioni |
@@ -67,11 +70,15 @@ Non solo «aggiungi peso». Undici tipi di modifica (`ProposalChange`):
 
 ---
 
-## 3. Le cinque condizioni per un incremento di carico
+## 3. Le condizioni per un incremento di carico
 
 Un incremento viene proposto **solo se tutte** queste condizioni sono vere.
 Ciascuna produce un esito esplicito con la sua motivazione in italiano
 (`ConditionResult`), che finisce nella proposta.
+
+La specifica ne elenca cinque; il codice ne verifica **sei**, perché la
+revisione ha mostrato che «carico registrato» era un presupposto implicito che
+non veniva controllato.
 
 ### Condizione 1 — tutte le serie allenanti al limite superiore
 
@@ -114,20 +121,93 @@ vederla.
 `checkNoIssues()`. **Qualunque** fastidio segnalato su quell'esercizio blocca
 l'incremento, a prescindere dall'intensità dichiarata.
 
-### Condizione 5 — confermato in due esposizioni consecutive confrontabili
+### Condizione 5 — carico registrato in modo completo
+
+`checkLoadRecorded()`. Aggiunta **dopo la revisione**. Distingue quattro casi:
+
+| Caso | Esito |
+|---|---|
+| L'esercizio non prevede carico (corpo libero, a tempo) | soddisfatta, e lo dichiara |
+| Carico presente e uguale su tutte le serie | soddisfatta |
+| Carico assente su **alcune** serie (`partialLoads`) | **blocca**, con `noLoadRecorded` |
+| Carichi **diversi** fra le serie (`mixedLoads`) | **blocca**: non esiste un riferimento unico da aumentare |
+
+Serviva perché un carico cancellato correggendo una serie già confermata rendeva
+l'esposizione «a carico uniforme», e la proposta **citava come registrato** un
+valore che non esisteva. La causa a monte è stata chiusa anche nel livello di
+persistenza: `SetRepository.correct()` ora rifiuta di svuotare il carico di una
+serie confermata la cui convenzione lo richiede.
+
+### Condizione 6 — confermato in due esposizioni consecutive confrontabili
 
 `decideProgression()` richiede che le **due esposizioni più recenti** soddisfino
-tutte e quattro le condizioni precedenti. Una sola non basta.
+tutte le condizioni precedenti. Una sola non basta.
 
-«Confrontabili» ha il significato tecnico della chiave di comparabilità: due
-prestazioni su **macchine diverse** non sono la seconda esposizione richiesta.
+«Confrontabili» significa **due cose**, e inizialmente il codice ne controllava
+una sola:
+
+1. **stesso attrezzo e stessa convenzione** — la chiave di comparabilità. Due
+   prestazioni su macchine diverse non sono la seconda esposizione richiesta;
+2. **stessa prescrizione** — `prescriptionSignature`: serie previste,
+   intervallo, metrica, lato e margine.
+
+Il secondo controllo è stato aggiunto dopo la revisione, che ha dimostrato il
+caso concreto: la **settimana di scarico** del piano prescrive meno serie e
+margine 4, e dichiara esplicitamente che i carichi restano quelli della
+settimana precedente. Senza il controllo sulla prescrizione, una seduta di
+scarico contava come «seconda esposizione consecutiva confrontabile» e
+confermava un incremento che nessuno aveva guadagnato — proponendolo, peggio,
+per una settimana con un intervallo di ripetizioni più basso.
+
+### Una ripetizione in più è un incremento
+
+Il caso più pericoloso trovato dalla revisione. La proposta «prova una
+ripetizione in più» veniva valutata **prima** delle condizioni, e non guardava
+fastidio, tecnica né margine: il motore poteva proporre «prova 7 ripetizioni»
+nella seduta successiva a un dolore che aveva **interrotto l'esercizio**, con
+tecnica dichiarata ceduta e margine zero, e senza nessuna avvertenza.
+
+Ora:
+
+| Segnale | Effetto sulla proposta di ripetizioni |
+|---|---|
+| Fastidio segnalato | **blocca** |
+| Tecnica non controllata o non dichiarata | **blocca** |
+| Margine insufficiente o non dichiarato | non blocca (non si aggiunge carico) ma viene **dichiarato** fra le informazioni mancanti |
+| Dispersione ampia fra le serie | **blocca** e lo segnala: non si costruisce un «+1» su una serie crollata |
+
+La proposta resta inoltre **dentro l'intervallo prescritto anche verso il
+basso**: prima il limite c'era solo verso l'alto, e una serie crollata da 12 a 5
+su un esercizio prescritto 10-12 produceva «prova 6 ripetizioni».
 
 ---
 
 ## 4. Dati mancanti non sono risultati positivi
 
-Non esiste, nel codice del motore, un percorso in cui un valore assente diventi
-`true`. Nessun `?? 0`, nessun `|| 0`, nessun `?? true` sui dati dell'atleta.
+> **Questa affermazione era falsa, ed è stata corretta.**
+>
+> Una prima versione di questo documento diceva: «Non esiste, nel codice del
+> motore, un percorso in cui un valore assente diventi `true`». La revisione
+> indipendente `coach-safety` ha dimostrato che ne esistevano **cinque**, con
+> casi riproducibili. Sono stati corretti, e ogni correzione ha un test di
+> regressione in `packages/core/test/engineRegressions.test.ts`.
+>
+> I cinque percorsi erano: `Math.min(...[])` che vale `Infinity` e faceva
+> risultare «coerente» un margine inesistente; `[].every()` che vale `true` e
+> faceva risultare raggiunto il limite superiore con zero serie; un carico
+> assente su una serie filtrato via prima del controllo di uniformità, che
+> trasformava un buco in «carico uniforme»; `latest.loadKg ?? 0`, che proponeva
+> 0 kg su un esercizio senza carico; e un valore di ripetizioni assente che
+> contribuiva 0 a un totale, mascherando un progresso.
+>
+> Il fatto che l'affermazione fosse scritta con sicurezza in un documento non
+> l'ha resa vera. È la ragione per cui la specifica (§17) richiede che l'autore
+> di una parte non sia il suo unico revisore.
+
+Lo stato **attuale**, verificato: quando un dato manca, il motore **mantiene** e
+**dichiara cosa manca**. L'unico `?? 0` residuo nel motore riguarda un criterio
+di ordinamento (una seduta senza istante di avvio finisce in coda fra quelle
+dello stesso giorno), non un dato dell'atleta, e il codice lo dichiara.
 
 Quando un dato manca, il motore **mantiene** e **dichiara cosa manca**:
 

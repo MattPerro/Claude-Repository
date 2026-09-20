@@ -12,6 +12,7 @@
 
 import type { ExercisePrescription, TargetRange } from '../domain/prescription.js';
 import type { SetMetric } from '../units.js';
+import { requiresNoLoad } from '../units.js';
 import type {
   DiscomfortReport,
   PerformedExercise,
@@ -19,7 +20,7 @@ import type {
   Session,
   TechniqueRating,
 } from '../domain/session.js';
-import type { LocalDate } from '../time.js';
+import type { Instant, LocalDate } from '../time.js';
 import { compareDates } from '../time.js';
 import { workingSetsCompleted } from '../domain/session.js';
 
@@ -54,8 +55,50 @@ export interface Exposure {
    * diversi fra loro.
    */
   readonly loadKg: number | null;
-  /** true se le serie completate hanno usato carichi diversi. */
+  /** true se le serie completate hanno usato carichi diversi fra loro. */
   readonly mixedLoads: boolean;
+  /**
+   * true se ALCUNE serie hanno un carico e altre no. E' un dato incompleto:
+   * il motore non deve trattarlo come un carico uniforme.
+   */
+  readonly partialLoads: boolean;
+  /** true se l'esercizio non prevede un carico (corpo libero, a tempo). */
+  readonly loadNotApplicable: boolean;
+  /** Settimana di programma della fotografia, per la diagnostica. */
+  readonly weekIndex: number;
+  readonly blockId: string;
+  /**
+   * Firma della prescrizione: serie previste, intervallo e sforzo.
+   *
+   * Due esposizioni con firme diverse non sono confrontabili come RISULTATO,
+   * anche se l'attrezzo e' lo stesso. E' quello che impedisce a una settimana
+   * di scarico (meno serie, margine piu' ampio) di "confermare" un
+   * incremento.
+   */
+  readonly prescriptionSignature: string;
+  /** Istante di avvio della seduta, per ordinare due sedute nello stesso giorno. */
+  readonly startedAt: Instant | null;
+}
+
+/**
+ * Firma della parte di prescrizione che rende due risultati confrontabili.
+ *
+ * Non include il recupero ne' la convenzione di carico: il recupero non cambia
+ * cosa significa "8 ripetizioni", e la convenzione e' gia' nella chiave di
+ * comparabilita'.
+ */
+export function prescriptionSignature(prescription: ExercisePrescription): string {
+  const effort =
+    prescription.effort.kind === 'rir'
+      ? `rir:${String(prescription.effort.rir.min)}-${String(prescription.effort.rir.max)}`
+      : 'duration';
+  return [
+    `sets:${String(prescription.workingSets)}`,
+    `target:${String(prescription.target.min)}-${String(prescription.target.max)}`,
+    `metric:${prescription.metric}`,
+    `perSide:${String(prescription.perSide)}`,
+    effort,
+  ].join('|');
 }
 
 /**
@@ -92,16 +135,37 @@ export function extractExposures(history: readonly SessionHistoryEntry[]): reado
       const comparabilityKey = sets[0]?.comparabilityKey;
       if (comparabilityKey === undefined) continue;
 
-      // La prescrizione si cerca per esercizio EFFETTIVAMENTE svolto, non per
-      // posizione: se c'e' stata una sostituzione, la prescrizione originale
-      // non descrive quello che e' stato fatto.
-      const prescription =
-        snapshot.exercises.find((p) => p.exerciseId === performed.exerciseId) ??
-        snapshot.exercises.find((p) => p.order === performed.order);
+      // La prescrizione si cerca SOLO per esercizio effettivamente svolto.
+      //
+      // Qui c'era un ripiego "altrimenti prendi quella in questa posizione",
+      // che contraddiceva il commento sopra e produceva il difetto peggiore
+      // trovato in revisione: dopo una sostituzione, un leg curl (prescritto
+      // 10-12) veniva giudicato contro l'intervallo 6-8 della pressa, e 8
+      // ripetizioni contavano come "limite superiore raggiunto".
+      //
+      // Se la prescrizione dell'esercizio svolto non e' nella fotografia,
+      // l'esposizione NON e' valutabile: non si giudica una prestazione con
+      // l'intervallo di un altro esercizio. Viene scartata.
+      const prescription = snapshot.exercises.find(
+        (p) => p.exerciseId === performed.exerciseId,
+      );
       if (prescription === undefined) continue;
 
-      const loads = sets.map((s) => s.load.kg).filter((kg): kg is number => kg !== null);
-      const uniqueLoads = new Set(loads);
+      // I carichi vanno classificati in TRE casi, non due.
+      //
+      // Prima i `null` venivano filtrati prima del controllo di uniformita',
+      // quindi tre serie a 60 / assente / 60 diventavano "carico uniforme 60
+      // kg": un dato mancante si trasformava in un dato presente, e la
+      // proposta ne citava il valore come se fosse stato registrato.
+      const rawLoads = sets.map((s) => s.load.kg);
+      const presentLoads = rawLoads.filter((kg): kg is number => kg !== null);
+      const allAbsent = presentLoads.length === 0;
+      const allPresent = presentLoads.length === rawLoads.length;
+      const uniquePresent = new Set(presentLoads);
+      // `partialLoads`: alcune serie hanno un carico e altre no. E' un dato
+      // incompleto, e il motore lo deve trattare come tale.
+      const partialLoads = !allAbsent && !allPresent;
+
       const firstSet = sets[0];
       if (firstSet === undefined) continue;
 
@@ -119,13 +183,34 @@ export function extractExposures(history: readonly SessionHistoryEntry[]): reado
         metric: firstSet.metric,
         target: prescription.target,
         perSide: prescription.perSide,
-        loadKg: uniqueLoads.size === 1 ? (loads[0] ?? null) : null,
-        mixedLoads: uniqueLoads.size > 1,
+        loadKg: allPresent && uniquePresent.size === 1 ? (presentLoads[0] ?? null) : null,
+        mixedLoads: uniquePresent.size > 1,
+        partialLoads,
+        // L'esercizio non prevede un carico: e' un fatto, non un dato
+        // mancante. Serve a non chiedere all'utente di colmare
+        // un'informazione che non potra' mai esistere (difetto M5).
+        loadNotApplicable: requiresNoLoad(prescription.loadConvention),
+        weekIndex: entry.session.snapshot.weekIndex,
+        blockId: entry.session.snapshot.blockId,
+        prescriptionSignature: prescriptionSignature(prescription),
+        startedAt: entry.session.startedAt,
       });
     }
   }
 
-  return out.sort((a, b) => compareDates(b.date, a.date));
+  // Ordina dalla piu' recente. A parita' di data si usa l'istante di avvio:
+  // senza questo, con due sedute nello stesso giorno le "due esposizioni piu'
+  // recenti" erano quelle che capitavano prima nell'array, e l'esito del
+  // motore dipendeva dall'ordine con cui il chiamante passava lo storico.
+  return out.sort((a, b) => {
+    const byDate = compareDates(b.date, a.date);
+    if (byDate !== 0) return byDate;
+    // `?? 0` qui riguarda un criterio di ORDINAMENTO, non un dato
+    // dell'atleta: una seduta senza istante di avvio finisce in coda fra
+    // quelle dello stesso giorno. Nessun valore mancante diventa un
+    // risultato.
+    return (b.startedAt ?? 0) - (a.startedAt ?? 0);
+  });
 }
 
 /**
@@ -169,7 +254,13 @@ export function performedValue(set: PerformedSet): number | null {
  * Un valore mancante (`null`) fa fallire il controllo: non e' un successo.
  */
 export function allSetsAtRangeTop(exposure: Exposure): boolean {
+  // Zero serie non sono "tutte le serie": `[].every()` vale `true`, e senza
+  // questa guardia un'esposizione vuota soddisfaceva la condizione.
+  if (exposure.completedSets.length === 0) return false;
   const required = prescribedSetEvents(exposure.prescription);
+  // Una prescrizione che non chiede nessuna serie non e' un riferimento
+  // valido per dichiarare un limite superiore raggiunto.
+  if (required < 1) return false;
   if (exposure.completedSets.length < required) return false;
   return exposure.completedSets.every((set) => {
     const value = performedValue(set);
@@ -177,12 +268,26 @@ export function allSetsAtRangeTop(exposure: Exposure): boolean {
   });
 }
 
-/** Migliore valore eseguito nell'esposizione (per il confronto dei progressi). */
-export function bestPerformedValue(exposure: Exposure): number | null {
+/**
+ * Valore eseguito PIU' BASSO dell'esposizione.
+ *
+ * Si chiamava `bestPerformedValue` ma restituiva il minimo: il nome diceva il
+ * contrario di quello che faceva, e un chiamante l'ha usata come "valore
+ * corrente" producendo una proposta sotto il minimo prescritto.
+ */
+export function lowestPerformedValue(exposure: Exposure): number | null {
   const values = exposure.completedSets
     .map(performedValue)
     .filter((v): v is number => v !== null);
   return values.length === 0 ? null : Math.min(...values);
+}
+
+/** Valore eseguito piu' alto dell'esposizione. */
+export function highestPerformedValue(exposure: Exposure): number | null {
+  const values = exposure.completedSets
+    .map(performedValue)
+    .filter((v): v is number => v !== null);
+  return values.length === 0 ? null : Math.max(...values);
 }
 
 /**
@@ -206,6 +311,14 @@ export interface VolumeResult {
 
 export function exposureVolume(exposure: Exposure): VolumeResult | null {
   if (exposure.metric === 'seconds') return null;
+  if (exposure.completedSets.length === 0) return null;
+  // Carichi parzialmente assenti: nessun volume attendibile.
+  if (exposure.partialLoads) return null;
+  // Convenzioni diverse nella stessa esposizione: sommarle e dichiararne una
+  // sola produce un numero senza significato. La chiave di comparabilita' lo
+  // impedisce con dati validi, ma questa funzione e' esportata.
+  const conventions = new Set(exposure.completedSets.map((s) => s.load.convention));
+  if (conventions.size > 1) return null;
 
   let total = 0;
   let convention = '';
@@ -227,8 +340,16 @@ export function exposureVolume(exposure: Exposure): VolumeResult | null {
         break;
       case 'perDumbbell':
         if (kg === null) return null;
-        total += kg * 2 * reps;
-        convention = 'kg per manubrio x 2 x ripetizioni';
+        // Negli esercizi PER LATO si solleva un manubrio per volta: non si
+        // moltiplica per due. Farlo raddoppiava il volume di ogni esercizio
+        // unilaterale con manubri.
+        if (exposure.perSide) {
+          total += kg * reps;
+          convention = 'kg per manubrio x ripetizioni (un lato per volta)';
+        } else {
+          total += kg * 2 * reps;
+          convention = 'kg per manubrio x 2 x ripetizioni';
+        }
         break;
       case 'bodyweightPlus':
         if (kg === null) return null;

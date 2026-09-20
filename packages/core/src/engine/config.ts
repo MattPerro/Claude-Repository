@@ -5,6 +5,13 @@
  * REGOLE PROGETTUALI dai criteri sostenuti da fonti scientifiche. Qui ogni
  * valore porta accanto la sua natura:
  *
+ * NOTA su un campo rimosso: esisteva `allowIncreaseWithMissingData: false`,
+ * presentato come "interruttore che rende il vincolo ispezionabile". Non era
+ * letto da nessuna riga del motore: era una dichiarazione di intenti travestita
+ * da configurazione, e un test che ne verificava il valore dava l'impressione
+ * di verificare un comportamento. Il vincolo vero e' nei test di
+ * `engine.test.ts` che provano i singoli dati mancanti.
+ *
  *   [PROGETTO]  scelta di progetto prudenziale, discutibile e configurabile.
  *               Non e' sostenuta da una fonte primaria: e' il modo in cui
  *               questa app decide, non un'affermazione sulla fisiologia.
@@ -80,12 +87,6 @@ export interface EngineConfig {
    */
   readonly proposalValidityDays: number;
 
-  /**
-   * [SPEC] Il motore non propone MAI un incremento quando manca uno dei dati
-   * necessari. Questo interruttore esiste solo per rendere il vincolo
-   * ispezionabile nei test: portarlo a `true` fa fallire i test di sicurezza.
-   */
-  readonly allowIncreaseWithMissingData: false;
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -97,5 +98,4 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   interruptionDaysToReentry: 42,
   maxExposuresConsidered: 12,
   proposalValidityDays: 14,
-  allowIncreaseWithMissingData: false,
 };

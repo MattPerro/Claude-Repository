@@ -188,18 +188,3 @@ export function buildSnapshot(
     capturedAt,
   };
 }
-
-/**
- * Fotografia con una prescrizione **sostituita** (seduta accorciata, esercizio
- * sostituito solo per oggi).
- *
- * Serve perche' la fotografia dev'essere quella effettivamente seguita: se si
- * accorcia la seduta prima di iniziare, congelare la versione integrale
- * renderebbe la seduta "parziale" per definizione.
- */
-export function snapshotWithPrescription(
-  snapshot: PrescriptionSnapshot,
-  prescription: SessionPrescription,
-): PrescriptionSnapshot {
-  return { ...snapshot, prescription };
-}

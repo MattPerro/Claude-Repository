@@ -340,10 +340,27 @@ describe('Dati incompleti non producono incrementi ingiustificati (SPEC §5.1)',
     expect(extractExposures(history)).toEqual([]);
   });
 
-  it('la configurazione non permette di aggirare il controllo sui dati mancanti', () => {
-    // Il tipo di `allowIncreaseWithMissingData` e' letteralmente `false`:
-    // non esiste un valore che riattivi il comportamento vietato.
-    expect(DEFAULT_ENGINE_CONFIG.allowIncreaseWithMissingData).toBe(false);
+  it('due esposizioni con un carico assente su una serie non bastano', () => {
+    // Sostituisce un test che verificava soltanto il valore di un campo di
+    // configurazione mai letto dal motore: dava l'impressione di verificare
+    // un comportamento senza verificarne nessuno. Questo invece prova il
+    // comportamento.
+    const sets = [
+      { reps: 8, kg: 60, rir: 2 },
+      { reps: 8, kg: null, rir: 2 },
+      { reps: 8, kg: 60, rir: 2 },
+    ];
+    const history = [
+      buildHistoryEntry({
+        performedDate: '2026-10-29',
+        exposures: [{ exerciseId: 'legPress', equipmentInstanceId: LEG_PRESS_A.id, sets }],
+      }),
+      buildHistoryEntry({
+        performedDate: '2026-10-26',
+        exposures: [{ exerciseId: 'legPress', equipmentInstanceId: LEG_PRESS_A.id, sets }],
+      }),
+    ];
+    expect(loadIncreases(evaluate(buildContext({ history })).proposals)).toEqual([]);
   });
 });
 

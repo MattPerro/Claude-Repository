@@ -164,7 +164,7 @@ export default function TodayScreen(): React.ReactElement {
           </TsText>
           <SyncIndicator
             state={store.sync.state}
-            detail={store.sync.detail ?? undefined}
+            {...(store.sync.detail === null ? {} : { detail: store.sync.detail })}
             onPress={() => {
               router.push('/impostazioni');
             }}

@@ -263,7 +263,18 @@ dati registrati**:
 | `adherence` | almeno X% delle sedute previste completate nelle ultime N settimane |
 | `always` | nessuna condizione (solo blocco iniziale e blocchi a volume ridotto) |
 
-Se i criteri non sono soddisfatti, **il blocco precedente si ripete**.
+> **Stato di implementazione, da correggere.** La revisione indipendente ha
+> rilevato che questi criteri sono **dati completi e verificati nel piano**, ma
+> **nessun codice li valuta**: non esiste una funzione che legga
+> `entryCriteria` e decida se il passaggio al blocco successivo è ammesso. Sono
+> quindi oggi una **documentazione del percorso**, non un controllo attivo.
+> L'avanzamento di blocco resta una decisione dell'utente, informata dalle
+> proposte del motore (che invece valuta i dati e propone di ripetere la
+> settimana dopo un'interruzione). È registrato come difetto importante in
+> `QA_REPORT.md`.
+
+Quando i criteri verranno valutati, la regola prevista è: se non sono
+soddisfatti, **il blocco precedente si ripete**.
 
 ### Nessun carico futuro, nessun test massimale
 
