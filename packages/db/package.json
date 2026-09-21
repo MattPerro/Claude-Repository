@@ -17,6 +17,7 @@
     "sql.js": "^1.14.2"
   },
   "devDependencies": {
-    "@types/sql.js": "^1.4.11"
+    "@types/sql.js": "^1.4.11",
+    "fake-indexeddb": "^6.2.5"
   }
 }

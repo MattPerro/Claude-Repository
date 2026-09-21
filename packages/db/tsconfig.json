@@ -3,7 +3,13 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "types": ["node"]
+    "types": ["node"],
+    // `DOM` serve solo per i tipi di IndexedDB, usati dall'archivio durevole
+    // della PWA (`drivers/indexedDbStore.ts`). NON autorizza l'uso della rete:
+    // il divieto "nessun percorso di salvataggio attende la rete" resta, ed e'
+    // verificabile con
+    //   grep -rn "fetch(\|XMLHttpRequest" packages/db/src   # deve essere vuoto
+    "lib": ["ES2023", "DOM"]
   },
   "include": ["src/**/*.ts"],
   "references": [{ "path": "../core" }]

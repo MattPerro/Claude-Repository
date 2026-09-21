@@ -19,6 +19,7 @@ export * from './drivers/expoSqlite.js';
 // dall'esterno. Importarlo non trascina quindi alcuna dipendenza nel bundle di
 // chi non lo usa.
 export * from './drivers/sqlJs.js';
+export * from './drivers/indexedDbStore.js';
 
 // `./drivers/nodeSqlite.js` NON e' riesportato da qui, deliberatamente.
 //
