@@ -3,12 +3,13 @@
  *
  * Ordine di avvio, e il motivo di ciascun passo:
  *
- *  1. **identita'** (`expo-secure-store`): `openDatabaseTolerant` vuole
- *     `workspaceId` e `deviceId` nella configurazione, quindi devono esistere
- *     prima del database;
- *  2. **driver** (`openExpoSqlite` con `await import('expo-sqlite')`): l'import
- *     e' dinamico perche' `@trackstrong/db` non deve dipendere staticamente da
- *     un modulo nativo, altrimenti i suoi test su Node si romperebbero;
+ *  1. **identita'** (portachiavi sul dispositivo, `localStorage` nella PWA):
+ *     `openDatabaseTolerant` vuole `workspaceId` e `deviceId` nella
+ *     configurazione, quindi devono esistere prima del database;
+ *  2. **archivio della piattaforma** (`openPlatformStorage`): `expo-sqlite` sul
+ *     dispositivo, `sql.js` su IndexedDB nella PWA. Questo modulo non sa quale
+ *     dei due sta usando, ed e' per questo che le stesse schermate girano in
+ *     entrambi i modi;
  *  3. **apertura tollerante**: se lo schema dell'archivio e' piu' recente del
  *     codice non si rifiuta di partire. I dati locali restano leggibili e
  *     scrivibili e si blocca **solo** la sincronizzazione (§14,
@@ -53,7 +54,7 @@ import {
 import {
   createRepositories,
   openDatabaseTolerant,
-  openExpoSqlite,
+  StorageQuotaExceededError,
   SUPPORTED_PROTOCOL_VERSION,
   type Database,
   type Repositories,
@@ -64,6 +65,8 @@ import type { DriveStore } from '@trackstrong/sync';
 
 import { createUnauthenticatedDriveStore } from '../lib/driveStore';
 import { createAppIdGenerator, IdentityUnavailableError, loadIdentity } from './identity';
+import { openPlatformStorage } from './platform';
+import type { PlatformStorage, StoragePersistence } from './platformStorage';
 import {
   attemptSync,
   INITIAL_SYNC_SNAPSHOT,
@@ -73,6 +76,27 @@ import {
 } from './syncState';
 
 const DATABASE_NAME = 'trackstrong.db';
+
+/**
+ * Stato della scrittura durevole dell'ultima modifica.
+ *
+ * Esiste perche' nella PWA il COMMIT non e' la durabilita': fra il COMMIT e la
+ * scrittura in IndexedDB c'e' un intervallo in cui il dato vive solo nella
+ * memoria della scheda. Una spunta di conferma mostrata in quell'intervallo
+ * sarebbe una conferma per un dato che puo' ancora svanire, e la specifica
+ * (§10) vieta esattamente questo.
+ *
+ * Sul dispositivo nativo lo stato e' sempre `durable`, perche' su un file
+ * SQLite il COMMIT **e'** la durabilita'. Le schermate non devono distinguere
+ * i due casi: leggono questo stato e si comportano uguale.
+ */
+export type DurabilityState =
+  /** Niente in attesa: quello che si vede e' scritto. */
+  | { readonly kind: 'durable' }
+  /** Scrittura in corso. La conferma va attesa, non anticipata. */
+  | { readonly kind: 'saving' }
+  /** Scrittura NON riuscita. Va detto, non nascosto. */
+  | { readonly kind: 'failed'; readonly message: string };
 
 /** Tutto quello che le schermate possono usare quando l'app e' pronta. */
 export interface StoreCore {
@@ -95,8 +119,27 @@ export interface StoreCore {
   readonly timeZone: TimeZone;
   readonly today: LocalDate;
 
-  /** Rilegge dal database. Da chiamare dopo una scrittura. */
+  /**
+   * Rilegge dal database e avvia la scrittura durevole.
+   *
+   * Da chiamare dopo ogni scrittura. Non attende: l'esito compare in
+   * {@link StoreCore.durability}, cosi' una schermata che non ha bisogno di
+   * bloccarsi non si blocca, e una che deve confermare qualcosa aspetta
+   * {@link StoreCore.flushNow}.
+   */
   reload(): void;
+  /**
+   * Attende che le modifiche siano durevoli, e **rilancia** se non lo sono.
+   *
+   * Da attendere prima di mostrare una conferma all'utente.
+   */
+  flushNow(): Promise<void>;
+  /** Stato della scrittura durevole. */
+  readonly durability: DurabilityState;
+  /** Dove vivono i dati, per la schermata impostazioni. */
+  readonly storageDescription: string;
+  /** Quanto e' protetto l'archivio dalla cancellazione. */
+  readonly storagePersistence: StoragePersistence;
   saveSettings(patch: Partial<AppSettings>): void;
   /** Crea archivio, profilo, piano e cursore. Idempotente sul workspace. */
   completeOnboarding(input: SaveProfileInput): void;
@@ -121,16 +164,14 @@ interface OpenedDatabase {
   readonly repos: Repositories;
   readonly deviceId: string;
   readonly workspaceId: string;
+  readonly storage: PlatformStorage;
 }
 
 async function openEverything(clock: Clock, ids: IdGenerator): Promise<OpenedDatabase> {
   const identity = await loadIdentity(clock);
+  const storage = await openPlatformStorage(DATABASE_NAME);
 
-  // L'unico punto dell'intero progetto che nomina `expo-sqlite`.
-  const sqliteModule = await import('expo-sqlite');
-  const driver = openExpoSqlite({ module: sqliteModule, databaseName: DATABASE_NAME });
-
-  const { db } = openDatabaseTolerant(driver, {
+  const { db } = openDatabaseTolerant(storage.driver, {
     workspaceId: identity.workspaceId,
     deviceId: identity.deviceId,
     clock,
@@ -143,6 +184,7 @@ async function openEverything(clock: Clock, ids: IdGenerator): Promise<OpenedDat
     repos,
     deviceId: identity.deviceId,
     workspaceId: identity.workspaceId,
+    storage,
   };
 }
 
@@ -203,6 +245,7 @@ export function StoreProvider({
   const [sync, setSync] = useState<SyncSnapshot>(INITIAL_SYNC_SNAPSHOT);
   const [version, setVersion] = useState(0);
   const [attempt, setAttempt] = useState(0);
+  const [durability, setDurability] = useState<DurabilityState>({ kind: 'durable' });
 
   // ---------------------------------------------------------------- apertura
   useEffect(() => {
@@ -211,7 +254,7 @@ export function StoreProvider({
     void openEverything(clock, ids)
       .then((result) => {
         if (cancelled) {
-          result.db.close();
+          result.storage.close();
           return;
         }
         result.repos.workspace.ensureWorkspace(
@@ -219,7 +262,11 @@ export function StoreProvider({
           clock.now(),
           SUPPORTED_PROTOCOL_VERSION,
         );
-        result.repos.workspace.registerDevice('Questo dispositivo', 'ios', clock.now());
+        result.repos.workspace.registerDevice(
+          result.storage.deviceLabel,
+          result.storage.devicePlatform,
+          clock.now(),
+        );
         if (result.repos.sync.state() === null) {
           result.repos.sync.initState(SUPPORTED_PROTOCOL_VERSION);
         }
@@ -239,6 +286,26 @@ export function StoreProvider({
   }, [clock, ids, attempt]);
 
   // ------------------------------------------------------------------ azioni
+  const flushNow = useCallback(async () => {
+    if (opened === null) return;
+    const { storage } = opened;
+    if (!storage.hasPendingWrites()) {
+      setDurability({ kind: 'durable' });
+      return;
+    }
+    setDurability({ kind: 'saving' });
+    try {
+      await storage.flush();
+      setDurability({ kind: 'durable' });
+    } catch (cause) {
+      // Lo stato diventa `failed` E l'errore viene rilanciato: chi attendeva
+      // per mostrare una conferma non deve mostrarla, e chi non attendeva
+      // deve comunque vedere il banner.
+      setDurability({ kind: 'failed', message: describePersistFailure(cause) });
+      throw cause;
+    }
+  }, [opened]);
+
   const reload = useCallback(() => {
     if (opened === null) return;
     const next = readAll(opened, timeZoneRef.current);
@@ -246,7 +313,10 @@ export function StoreProvider({
     setLoaded(next);
     setSync((previous) => readSyncSnapshot(opened.db, opened.repos, previous));
     setVersion((n) => n + 1);
-  }, [opened]);
+    // L'errore e' gia' riportato in `durability`: qui si ignora il rifiuto
+    // della promessa, non il fallimento.
+    void flushNow().catch(() => undefined);
+  }, [opened, flushNow]);
 
   const requestSync = useCallback(
     (moment: SyncMoment) => {
@@ -352,6 +422,10 @@ export function StoreProvider({
       timeZone: loaded.settings.timeZone,
       today: instantToLocalDate(clock.now(), loaded.settings.timeZone),
       reload,
+      flushNow,
+      durability,
+      storageDescription: opened.storage.storageDescription,
+      storagePersistence: opened.storage.persistence,
       saveSettings,
       completeOnboarding,
       requestSync,
@@ -374,12 +448,38 @@ export function StoreProvider({
     clock,
     drive,
     reload,
+    flushNow,
+    durability,
     saveSettings,
     completeOnboarding,
     requestSync,
   ]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+}
+
+/**
+ * Messaggio per una scrittura durevole non riuscita.
+ *
+ * Deve dire **che cosa fare**, non solo che qualcosa e' andato storto: una
+ * quota esaurita e un archivio inaccessibile richiedono due azioni diverse, e
+ * "errore di salvataggio" non ne suggerisce nessuna. In nessun caso si dice
+ * che il dato e' salvato.
+ */
+function describePersistFailure(cause: unknown): string {
+  if (cause instanceof StorageQuotaExceededError) return cause.message;
+  if (cause instanceof Error) {
+    return (
+      `Il salvataggio NON e' riuscito: ${cause.message} ` +
+      'Quello che hai appena registrato non e ancora al sicuro. Non chiudere ' +
+      "l'app: riprova, oppure esporta un backup dalle impostazioni."
+    );
+  }
+  return (
+    "Il salvataggio NON e' riuscito, per un motivo non identificato. Quello " +
+    'che hai appena registrato non e ancora al sicuro. Riprova, oppure ' +
+    'esporta un backup dalle impostazioni.'
+  );
 }
 
 function describeBootFailure(cause: unknown): string {

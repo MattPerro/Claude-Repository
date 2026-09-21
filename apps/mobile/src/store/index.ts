@@ -2,9 +2,11 @@ export {
   StoreProvider,
   useStore,
   useStoreStatus,
+  type DurabilityState,
   type StoreCore,
   type StoreStatus,
 } from './StoreProvider';
+export type { PlatformStorage, StoragePersistence } from './platformStorage';
 export {
   attemptSync,
   readSyncSnapshot,

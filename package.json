@@ -13,7 +13,10 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "mobile": "npm run start --workspace @trackstrong/mobile",
-    "screenshots": "node tools/screenshots.mjs"
+    "screenshots": "node tools/screenshots.mjs",
+    "pwa": "node tools/pwa-build.mjs",
+    "pwa:serve": "node tools/pwa-build.mjs --serve",
+    "icons": "node tools/icons.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",

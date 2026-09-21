@@ -17,6 +17,14 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "lang": "it",
+      "name": "TrackStrong",
+      "shortName": "TrackStrong",
+      "description": "Allenamento, calendario e progressi. I dati restano su questo dispositivo."
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store",
@@ -32,7 +40,8 @@
       "typedRoutes": true
     },
     "extra": {
-      "comment": "Il bundleIdentifier va sostituito con uno tuo (es. com.tuonome.trackstrong) prima della build. Vedi INSTALL_IPHONE.md. Nessun identificativo di progetto EAS: la build e' locale."
+      "comment": "Il bundleIdentifier va sostituito con uno tuo (es. com.tuonome.trackstrong) prima della build. Vedi INSTALL_IPHONE.md. Nessun identificativo di progetto EAS: la build e' locale.",
+      "commentWeb": "`web.output: 'single'` e' l'output PWA (una sola pagina). Il guscio HTML, il manifest e le icone sono generati da tools/pwa-build.mjs: `npm run pwa`. `lang: it` finisce nel segnaposto %LANG_ISO_CODE% di public/index.html."
     }
   }
 }

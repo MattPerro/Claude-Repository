@@ -75,3 +75,11 @@ npm-debug.log*
 
 # Screenshot di review generati localmente (rigenerabili)
 /artifacts/
+
+# ---------------------------------------------------------------------------
+# Risorse della PWA generate da `tools/pwa-build.mjs` e `tools/icons.mjs`.
+# Rigenerabili, e i colori vengono da `palette.ts`: un PNG o un manifest
+# committato a mano sarebbe una seconda copia del tema, destinata a divergere.
+# ---------------------------------------------------------------------------
+/apps/mobile/public/
+/apps/mobile/assets/*.png

@@ -27,6 +27,10 @@ import {
   type RandomSource,
 } from '@trackstrong/core';
 
+import { IdentityUnavailableError, type Identity } from './identityShared';
+
+export { IdentityUnavailableError, type Identity } from './identityShared';
+
 const DEVICE_KEY = 'trackstrong.deviceId';
 const WORKSPACE_KEY = 'trackstrong.workspaceId';
 
@@ -38,27 +42,6 @@ const WORKSPACE_KEY = 'trackstrong.workspaceId';
  * `expo-crypto` rende la dipendenza esplicita e verificabile.
  */
 const expoRandom: RandomSource = (byteLength) => getRandomBytes(byteLength);
-
-export class IdentityUnavailableError extends Error {
-  constructor(cause: unknown) {
-    super(
-      "L'archivio sicuro del dispositivo non e' accessibile, quindi non e' " +
-        'possibile leggere l\'identificativo di questa installazione. L\'avvio si ' +
-        'interrompe invece di generarne uno nuovo: un identificativo nuovo ' +
-        'duplicherebbe il dispositivo e l\'archivio. Riprova, e se il problema ' +
-        'resta verifica lo sblocco del portachiavi di iOS.',
-      { cause },
-    );
-    this.name = 'IdentityUnavailableError';
-  }
-}
-
-export interface Identity {
-  readonly deviceId: string;
-  readonly workspaceId: string;
-  /** `true` al primissimo avvio su questo dispositivo. */
-  readonly createdNow: boolean;
-}
 
 async function readOrCreate(key: string, make: () => string): Promise<{
   readonly value: string;
