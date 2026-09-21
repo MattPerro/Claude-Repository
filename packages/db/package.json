@@ -13,6 +13,10 @@
     "typecheck": "tsc -b && tsc --noEmit -p tsconfig.test.json"
   },
   "dependencies": {
-    "@trackstrong/core": "*"
+    "@trackstrong/core": "*",
+    "sql.js": "^1.14.2"
+  },
+  "devDependencies": {
+    "@types/sql.js": "^1.4.11"
   }
 }

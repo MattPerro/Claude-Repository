@@ -14,6 +14,12 @@
 export * from './driver.js';
 export * from './drivers/expoSqlite.js';
 
+// Il driver `sql.js` (browser/PWA) e' riesportato da qui perche', al contrario
+// di quello Node, non importa nulla: il modulo WebAssembly gli viene passato
+// dall'esterno. Importarlo non trascina quindi alcuna dipendenza nel bundle di
+// chi non lo usa.
+export * from './drivers/sqlJs.js';
+
 // `./drivers/nodeSqlite.js` NON e' riesportato da qui, deliberatamente.
 //
 // Importa `node:sqlite`, che Metro non sa risolvere: qualunque import di
